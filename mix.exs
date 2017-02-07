@@ -9,7 +9,7 @@ defmodule Accounting.Mixfile do
       description: "Accounting.",
       elixir: "~> 1.4",
       package: package(),
-      version: "0.1.0",
+      version: "0.1.1",
       start_permanent: Mix.env === :prod,
     ]
   end
@@ -19,7 +19,7 @@ defmodule Accounting.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:httpoison, "~> 0.9"},
       {:oauther, "~> 1.1.0"},
-      {:poison, "~> 3.0"},
+      {:poison, "~> 2.2 or ~> 3.0"},
     ]
   end
 
