@@ -6,22 +6,24 @@ defmodule Accounting do
     sort_transactions: 1,
   ]
 
-  @adapter Application.get_env(:accounting, :adapter, Accounting.TestAdapter)
+  def register_categories(categories) do
+    adapter().register_categories(categories)
+  end
 
-  defdelegate register_categories(categories), to: @adapter
+  def create_account(number), do: adapter().create_account(number)
 
-  defdelegate create_account(number), to: @adapter
-
-  defdelegate receive_money(from, date, line_items), to: @adapter
+  def receive_money(from, date, line_items) do
+    adapter().receive_money(from, date, line_items)
+  end
 
   def fetch_account_transactions(account_number) do
-    with {:ok, txns} <- @adapter.fetch_account_transactions(account_number) do
+    with {:ok, txns} <- adapter().fetch_account_transactions(account_number) do
       {:ok, sort_transactions(txns)}
     end
   end
 
   def fetch_balance(account_number) do
-    with {:ok, txns} <- @adapter.fetch_account_transactions(account_number) do
+    with {:ok, txns} <- adapter().fetch_account_transactions(account_number) do
       {:ok, calculate_balance(txns)}
     end
   end
@@ -37,4 +39,6 @@ defmodule Accounting do
       {:ok, calculate_ADB!(transactions, start_date, end_date)}
     end
   end
+
+  defp adapter, do: Application.fetch_env!(:accounting, :adapter)
 end
