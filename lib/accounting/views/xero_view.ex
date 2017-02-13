@@ -46,6 +46,27 @@ defmodule Accounting.XeroView do
     </BankTransactions>
     """
   end
+  def render("spend_money.xml", assigns) do
+    """
+    <BankTransactions>
+      <BankTransaction>
+        <Type>SPEND</Type>
+        <Contact><Name>#{xml_escape assigns[:to]}</Name></Contact>
+        <Date>#{assigns[:date]}</Date>
+        <LineItems>
+          #{for line_item <- assigns[:line_items] do
+              render("line_item.xml", line_item: line_item)
+            end}
+        </LineItems>
+        <BankAccount>
+          <AccountID>
+            #{Application.get_env(:accounting, :bank_account_id)}
+          </AccountID>
+        </BankAccount>
+      </BankTransaction>
+    </BankTransactions>
+    """
+  end
   def render("transfer.xml", assigns) do
     """
     <Invoices>

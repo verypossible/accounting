@@ -27,10 +27,10 @@ defmodule Accounting.Assertions do
     after
       @timeout ->
         flunk """
-          Money was not received from '#{from}' on #{date} with the line item:
+        Money was not received from '#{from}' on #{date} with the line item:
 
-          #{inspect line_item}
-          """
+        #{inspect line_item}
+        """
     end
   end
 
@@ -38,6 +38,28 @@ defmodule Accounting.Assertions do
     receive do
       {:received_money, ^from, ^date, _} ->
         flunk "Money was unexpectedly received."
+    after
+      @timeout -> true
+    end
+  end
+
+  def assert_spent_money_with_line_item(to, date, line_item) do
+    receive do
+      {:spent_money, ^to, ^date, ^line_item} -> true
+    after
+      @timeout ->
+        flunk """
+        Money was not spent towards '#{to}' on #{date} with the line item:
+
+        #{inspect line_item}
+        """
+    end
+  end
+
+  def refute_spent_money(to, date) do
+    receive do
+      {:spent_money, ^to, ^date, _} ->
+        flunk "Money was unexpectedly spent."
     after
       @timeout -> true
     end

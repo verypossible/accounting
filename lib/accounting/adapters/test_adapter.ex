@@ -51,6 +51,28 @@ defmodule Accounting.TestAdapter do
     end
   end
 
+  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items) do
+    Enum.each line_items, fn item ->
+      send self(), {:spent_money, to, date, item}
+    end
+
+    if all_exist?(for i <- line_items, do: i.account_number) do
+      Agent.update __MODULE__, fn state ->
+        Enum.reduce line_items, state, fn item, acc ->
+          number = item.account_number
+          transaction = %AccountTransaction{
+            amount: -item.amount,
+            description: item.description,
+            date: date,
+          }
+          Map.update!(acc, number, &List.insert_at(&1, 0, transaction))
+        end
+      end
+    else
+      {:error, :no_such_account}
+    end
+  end
+
   defp all_exist?(account_numbers) do
     Agent.get __MODULE__, fn state ->
       Enum.all?(account_numbers, &Map.has_key?(state, &1))
