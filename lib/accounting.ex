@@ -16,6 +16,10 @@ defmodule Accounting do
     adapter().receive_money(from, date, line_items)
   end
 
+  def spend_money(to, date, line_items) do
+    adapter().spend_money(to, date, line_items)
+  end
+
   def fetch_account_transactions(account_number) do
     with {:ok, txns} <- adapter().fetch_account_transactions(account_number) do
       {:ok, sort_transactions(txns)}

@@ -112,11 +112,33 @@ defmodule Accounting.XeroAdapter do
     |> did_receive_money()
   end
 
+  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items) do
+    line_items
+    |> Enum.reduce(0, & &1.amount + &2)
+    |> do_spend_money(to, date, line_items)
+  end
+
+  defp do_spend_money(0, to, date, line_items) do
+    "transfer.xml"
+    |> render(to: to, date: date, line_items: line_items)
+    |> put("Invoices")
+    |> did_transfer()
+  end
+  defp do_spend_money(_, to, date, line_items) do
+    "spend_money.xml"
+    |> render(to: to, date: date, line_items: line_items)
+    |> put("BankTransactions")
+    |> did_spend_money()
+  end
+
   defp did_transfer({:ok, %{status_code: 200}}), do: :ok
   defp did_transfer({_, reasons}), do: {:error, reasons}
 
   defp did_receive_money({:ok, %{status_code: 200}}), do: :ok
   defp did_receive_money({_, reasons}), do: {:error, reasons}
+
+  defp did_spend_money({:ok, %{status_code: 200}}), do: :ok
+  defp did_spend_money({_, reasons}), do: {:error, reasons}
 
   defp put(xml, endpoint) do
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}"
