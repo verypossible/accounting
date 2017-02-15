@@ -1,8 +1,10 @@
 defmodule Accounting.XeroAdapter do
-  @behaviour Accounting.Adapter
-
   alias Accounting.AccountTransaction
   import Accounting.XeroView, only: [render: 1, render: 2]
+
+  @behaviour Accounting.Adapter
+
+  @rate_limit_delay 1_000
 
   ## Callbacks
 
@@ -174,6 +176,7 @@ defmodule Accounting.XeroAdapter do
         transactions = Enum.reduce(journals, acc, &import_journal/2)
 
         if length(journals) === 100 do
+          Process.sleep(@rate_limit_delay)
           fetch_new(offset + 100, transactions)
         else
           {:ok, transactions, next_offset(journals) || offset}
