@@ -1,4 +1,6 @@
 defmodule Accounting.Helpers do
+  @moduledoc false
+
   def calculate_balance(account_transactions) do
     Enum.reduce(account_transactions, 0, & &1.amount + &2)
   end

@@ -1,4 +1,6 @@
 defmodule Accounting.XeroView do
+  @moduledoc false
+
   def render("start_link.xml") do
     """
     <TrackingCategories>

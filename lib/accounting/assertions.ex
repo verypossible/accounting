@@ -3,6 +3,7 @@ defmodule Accounting.Assertions do
 
   @timeout 100
 
+  @spec assert_registered_category(binary) :: true | no_return
   def assert_registered_category(category) do
     receive do
       {:registered_category, ^category} -> true
@@ -12,6 +13,7 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec assert_created_account(binary) :: true | no_return
   def assert_created_account(number) do
     receive do
       {:created_account, ^number} -> true
@@ -21,6 +23,7 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec assert_received_money_with_line_item(binary, Date.t, list(Accounting.LineItem.t)) :: true | no_return
   def assert_received_money_with_line_item(from, date, line_item) do
     receive do
       {:received_money, ^from, ^date, ^line_item} -> true
@@ -34,6 +37,7 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec refute_received_money(binary, Date.t) :: true | no_return
   def refute_received_money(from, date) do
     receive do
       {:received_money, ^from, ^date, _} ->
@@ -43,6 +47,7 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec assert_spent_money_with_line_item(binary, Date.t, list(Accounting.LineItem.t)) :: true | no_return
   def assert_spent_money_with_line_item(to, date, line_item) do
     receive do
       {:spent_money, ^to, ^date, ^line_item} -> true
@@ -56,6 +61,7 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec refute_spent_money(binary, Date.t) :: true | no_return
   def refute_spent_money(to, date) do
     receive do
       {:spent_money, ^to, ^date, _} ->
