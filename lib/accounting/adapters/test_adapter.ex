@@ -1,6 +1,8 @@
 defmodule Accounting.TestAdapter do
   @behaviour Accounting.Adapter
 
+  @moduledoc false
+
   alias Accounting.AccountTransaction
 
   def reset, do: Agent.update(__MODULE__, fn _ -> %{} end)

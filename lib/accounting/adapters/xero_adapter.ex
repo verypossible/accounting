@@ -2,6 +2,8 @@ defmodule Accounting.XeroAdapter do
   alias Accounting.AccountTransaction
   import Accounting.XeroView, only: [render: 1, render: 2]
 
+  @moduledoc false
+
   @behaviour Accounting.Adapter
 
   @rate_limit_delay 1_000
