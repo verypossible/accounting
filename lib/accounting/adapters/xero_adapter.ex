@@ -12,7 +12,7 @@ defmodule Accounting.XeroAdapter do
 
   def start_link do
     with {:ok, tracking_category_id}      <- ensure_tracking_category_exists(),
-         {:ok, transactions, next_offset} <- fetch_new(0, %{}) do
+         {:ok, transactions, next_offset} <- fetch_new(0, %{}, 15_000) do
       Agent.start_link fn ->
         %{
           tracking_category_id: tracking_category_id,
@@ -23,9 +23,9 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
-  defp ensure_tracking_category_exists do
+  defp ensure_tracking_category_exists() do
     "TrackingCategories/Category"
-    |> get()
+    |> get(5_000)
     |> ensure_tracking_category_exists()
   end
 
@@ -42,17 +42,17 @@ defmodule Accounting.XeroAdapter do
   defp ensure_tracking_category_exists({:ok, %{status_code: 404}}) do
     "start_link.xml"
     |> render()
-    |> put("TrackingCategories")
+    |> put("TrackingCategories", 5_000)
     |> ensure_tracking_category_exists()
   end
   defp ensure_tracking_category_exists({_, reasons}), do: {:error, reasons}
 
-  def register_categories(categories) when is_list(categories) do
+  def register_categories(categories, timeout) when is_list(categories) do
     id = Agent.get(__MODULE__, &Map.get(&1, :tracking_category_id))
 
     "register_categories.xml"
     |> render(categories: categories)
-    |> put("TrackingCategories/#{id}/Options")
+    |> put("TrackingCategories/#{id}/Options", timeout)
     |> did_register_categories()
   end
 
@@ -70,10 +70,10 @@ defmodule Accounting.XeroAdapter do
   end
   defp did_register_categories({_, reasons}), do: {:error, reasons}
 
-  def create_account(number) when is_binary(number) do
+  def create_account(number, timeout) when is_binary(number) do
     "create_account.xml"
     |> render(number: number)
-    |> put("Accounts")
+    |> put("Accounts", timeout)
     |> did_create_account()
   end
 
@@ -97,41 +97,41 @@ defmodule Accounting.XeroAdapter do
   defp validation_errors(%{"Elements" => [%{"ValidationErrors" => e}|_]}), do: e
   defp validation_errors(%{}), do: []
 
-  def receive_money(<<_::binary>> = from, %Date{} = date, [_|_] = line_items) do
+  def receive_money(<<_::binary>> = from, %Date{} = date, [_|_] = line_items, timeout) do
     line_items
     |> Enum.reduce(0, & &1.amount + &2)
-    |> do_receive_money(from, date, line_items)
+    |> do_receive_money(from, date, line_items, timeout)
   end
 
-  defp do_receive_money(0, from, date, line_items) do
+  defp do_receive_money(0, from, date, line_items, timeout) do
     "transfer.xml"
     |> render(from: from, date: date, line_items: line_items)
-    |> put("Invoices")
+    |> put("Invoices", timeout)
     |> did_transfer()
   end
-  defp do_receive_money(_, from, date, line_items) do
+  defp do_receive_money(_, from, date, line_items, timeout) do
     "receive_money.xml"
     |> render(from: from, date: date, line_items: line_items)
-    |> put("BankTransactions")
+    |> put("BankTransactions", timeout)
     |> did_receive_money()
   end
 
-  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items) do
+  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items, timeout) do
     line_items
     |> Enum.reduce(0, & &1.amount + &2)
-    |> do_spend_money(to, date, line_items)
+    |> do_spend_money(to, date, line_items, timeout)
   end
 
-  defp do_spend_money(0, to, date, line_items) do
+  defp do_spend_money(0, to, date, line_items, timeout) do
     "transfer.xml"
     |> render(to: to, date: date, line_items: line_items)
-    |> put("Invoices")
+    |> put("Invoices", timeout)
     |> did_transfer()
   end
-  defp do_spend_money(_, to, date, line_items) do
+  defp do_spend_money(_, to, date, line_items, timeout) do
     "spend_money.xml"
     |> render(to: to, date: date, line_items: line_items)
-    |> put("BankTransactions")
+    |> put("BankTransactions", timeout)
     |> did_spend_money()
   end
 
@@ -144,7 +144,7 @@ defmodule Accounting.XeroAdapter do
   defp did_spend_money({:ok, %{status_code: 200}}), do: :ok
   defp did_spend_money({_, reasons}), do: {:error, reasons}
 
-  defp put(xml, endpoint) do
+  defp put(xml, endpoint, timeout) do
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}"
     {oauth_header, _} =
       "put"
@@ -152,14 +152,14 @@ defmodule Accounting.XeroAdapter do
       |> OAuther.header()
 
     HTTPoison.put url, xml, [oauth_header, {"Accept", "application/json"}],
-      recv_timeout: 60_000
+      recv_timeout: timeout
   end
 
-  def fetch_account_transactions(number) when is_binary(number) do
+  def fetch_account_transactions(number, timeout) when is_binary(number) do
     offset = Agent.get(__MODULE__, &Map.get(&1, :next_offset))
     acc = Agent.get(__MODULE__, &Map.get(&1, :transactions))
 
-    with {:ok, transactions, next_offset} <- fetch_new(offset, acc) do
+    with {:ok, transactions, next_offset} <- fetch_new(offset, acc, timeout) do
       Agent.update(__MODULE__, &Map.put(&1, :transactions, transactions))
       Agent.update(__MODULE__, &Map.put(&1, :next_offset, next_offset))
 
@@ -167,8 +167,8 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
-  defp fetch_new(offset, acc) do
-    case get("Journals", offset: offset) do
+  defp fetch_new(offset, acc, timeout) do
+    case get("Journals", timeout, offset: offset) do
       {:ok, %{body: "{" <> _ = json}} ->
         journals =
           json
@@ -179,7 +179,7 @@ defmodule Accounting.XeroAdapter do
 
         if length(journals) === 100 do
           Process.sleep(@rate_limit_delay)
-          fetch_new(offset + 100, transactions)
+          fetch_new(offset + 100, transactions, timeout)
         else
           {:ok, transactions, next_offset(journals) || offset}
         end
@@ -218,7 +218,7 @@ defmodule Accounting.XeroAdapter do
     |> Map.fetch!("JournalNumber")
   end
 
-  defp get(endpoint, params \\ []) do
+  defp get(endpoint, timeout, params \\ []) do
     query = URI.encode_query(params)
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}?#{query}"
     {oauth_header, _} =
@@ -226,7 +226,8 @@ defmodule Accounting.XeroAdapter do
       |> OAuther.sign(url, [], credentials())
       |> OAuther.header()
 
-    HTTPoison.get(url, [oauth_header, {"Accept", "application/json"}])
+    HTTPoison.get url, [oauth_header, {"Accept", "application/json"}],
+      recv_timeout: timeout
   end
 
   defp credentials do

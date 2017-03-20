@@ -11,13 +11,13 @@ defmodule Accounting.TestAdapter do
 
   def start_link, do: Agent.start_link(&Map.new/0, name: __MODULE__)
 
-  def register_categories(categories) do
+  def register_categories(categories, _timeout) do
     Enum.each categories, fn category ->
       send self(), {:registered_category, category}
     end
   end
 
-  def create_account(number) do
+  def create_account(number, _timeout) do
     send self(), {:created_account, number}
 
     if exists?(number) do
@@ -31,7 +31,7 @@ defmodule Accounting.TestAdapter do
     Agent.get(__MODULE__, &Map.has_key?(&1, account_number))
   end
 
-  def receive_money(<<_::binary>> = from, %Date{} = date, [_|_] = line_items) do
+  def receive_money(<<_::binary>> = from, %Date{} = date, [_|_] = line_items, _timeout) do
     Enum.each line_items, fn item ->
       send self(), {:received_money, from, date, item}
     end
@@ -53,7 +53,7 @@ defmodule Accounting.TestAdapter do
     end
   end
 
-  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items) do
+  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items, _timeout) do
     Enum.each line_items, fn item ->
       send self(), {:spent_money, to, date, item}
     end
@@ -81,7 +81,7 @@ defmodule Accounting.TestAdapter do
     end
   end
 
-  def fetch_account_transactions(number) do
+  def fetch_account_transactions(number, _timeout) do
     {:ok, get_account_transactions(number)}
   end
 
