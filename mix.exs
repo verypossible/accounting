@@ -9,7 +9,7 @@ defmodule Accounting.Mixfile do
       description: "Accounting.",
       elixir: "~> 1.4",
       package: package(),
-      version: "0.3.2",
+      version: "0.3.3",
       start_permanent: Mix.env === :prod,
     ]
   end

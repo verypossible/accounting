@@ -11,18 +11,24 @@ defmodule Accounting.XeroAdapter do
   ## Callbacks
 
   def start_link do
-    with {:ok, tracking_category_id} <- ensure_tracking_category_exists() do
-      Agent.start_link fn -> tracking_category_id end,
-        name: __MODULE__.TrackingCategoryID
-
-      Agent.start_link(fn -> nil end, name: __MODULE__.Memo)
-      Agent.cast __MODULE__.Memo, fn _ ->
+    with {:ok, category_id} <- ensure_tracking_category_exists(),
+         {:ok, pid}         <- start_link(category_id) do
+      memo = Agent.get(pid, &Map.fetch!(&1, :memo))
+      Agent.cast memo, fn _ ->
         case fetch_new(0, %{}, 15_000) do
           {:ok, txns, offset} -> %{next_offset: offset, transactions: txns}
           _ -> %{next_offset: 0, transactions: %{}}
         end
       end
+      {:ok, pid}
     end
+  end
+
+  defp start_link(tracking_category_id) do
+    Agent.start_link fn ->
+      {:ok, memo} = Agent.start_link(fn -> nil end)
+      %{tracking_category_id: tracking_category_id, memo: memo}
+    end, name: __MODULE__
   end
 
   defp ensure_tracking_category_exists() do
@@ -50,7 +56,7 @@ defmodule Accounting.XeroAdapter do
   defp ensure_tracking_category_exists({_, reasons}), do: {:error, reasons}
 
   def register_categories(categories, timeout) when is_list(categories) do
-    id = Agent.get(__MODULE__.TrackingCategoryID, & &1, timeout)
+    id = Agent.get(__MODULE__, &Map.fetch!(&1, :tracking_category_id), timeout)
 
     "register_categories.xml"
     |> render(categories: categories)
@@ -158,11 +164,12 @@ defmodule Accounting.XeroAdapter do
   end
 
   def fetch_account_transactions(number, timeout) when is_binary(number) do
-    Agent.get_and_update __MODULE__.Memo, fn state ->
+    memo = Agent.get(__MODULE__, &Map.fetch!(&1, :memo), timeout)
+    Agent.get_and_update memo, fn state ->
       case fetch_new(state.next_offset, state.transactions, timeout) do
-        {:ok, transactions, offset} ->
-          value = {:ok, Enum.reverse(transactions[number] || [])}
-          new_state = %{transactions: transactions, next_offset: offset}
+        {:ok, txns, offset} ->
+          value = {:ok, Enum.reverse(txns[number] || [])}
+          new_state = %{transactions: txns, next_offset: offset}
           {value, new_state}
         error ->
           {error, state}
