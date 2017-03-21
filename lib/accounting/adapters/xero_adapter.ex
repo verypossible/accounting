@@ -11,15 +11,17 @@ defmodule Accounting.XeroAdapter do
   ## Callbacks
 
   def start_link do
-    with {:ok, tracking_category_id}      <- ensure_tracking_category_exists(),
-         {:ok, transactions, next_offset} <- fetch_new(0, %{}, 15_000) do
-      Agent.start_link fn ->
-        %{
-          tracking_category_id: tracking_category_id,
-          transactions: transactions,
-          next_offset: next_offset,
-        }
-      end, name: __MODULE__
+    with {:ok, tracking_category_id} <- ensure_tracking_category_exists() do
+      Agent.start_link fn -> tracking_category_id end,
+        name: __MODULE__.TrackingCategoryID
+
+      Agent.start_link(fn -> nil end, name: __MODULE__.Memo)
+      Agent.cast __MODULE__.Memo, fn _ ->
+        case fetch_new(0, %{}, 15_000) do
+          {:ok, txns, offset} -> %{next_offset: offset, transactions: txns}
+          _ -> %{next_offset: 0, transactions: %{}}
+        end
+      end
     end
   end
 
@@ -48,7 +50,7 @@ defmodule Accounting.XeroAdapter do
   defp ensure_tracking_category_exists({_, reasons}), do: {:error, reasons}
 
   def register_categories(categories, timeout) when is_list(categories) do
-    id = Agent.get(__MODULE__, &Map.get(&1, :tracking_category_id))
+    id = Agent.get(__MODULE__.TrackingCategoryID, & &1, timeout)
 
     "register_categories.xml"
     |> render(categories: categories)
@@ -156,15 +158,16 @@ defmodule Accounting.XeroAdapter do
   end
 
   def fetch_account_transactions(number, timeout) when is_binary(number) do
-    offset = Agent.get(__MODULE__, &Map.get(&1, :next_offset))
-    acc = Agent.get(__MODULE__, &Map.get(&1, :transactions))
-
-    with {:ok, transactions, next_offset} <- fetch_new(offset, acc, timeout) do
-      Agent.update(__MODULE__, &Map.put(&1, :transactions, transactions))
-      Agent.update(__MODULE__, &Map.put(&1, :next_offset, next_offset))
-
-      {:ok, Enum.reverse(transactions[number] || [])}
-    end
+    Agent.get_and_update __MODULE__.Memo, fn state ->
+      case fetch_new(state.next_offset, state.transactions, timeout) do
+        {:ok, transactions, offset} ->
+          value = {:ok, Enum.reverse(transactions[number] || [])}
+          new_state = %{transactions: transactions, next_offset: offset}
+          {value, new_state}
+        error ->
+          {error, state}
+      end
+    end, timeout
   end
 
   defp fetch_new(offset, acc, timeout) do
