@@ -7,6 +7,7 @@ defmodule Accounting.XeroAdapter do
   @behaviour Accounting.Adapter
 
   @rate_limit_delay 1_000
+  @xero_name_char_limit 150
 
   ## Callbacks
 
@@ -78,12 +79,20 @@ defmodule Accounting.XeroAdapter do
   end
   defp did_register_categories({_, reasons}), do: {:error, reasons}
 
-  def create_account(number, timeout) when is_binary(number) do
+  def create_account(number, description, timeout) when is_binary(number) do
+    length = @xero_name_char_limit - String.length(number) + 3
+    name = "#{truncate(description, length)} - #{number}"
+
     "create_account.xml"
-    |> render(number: number)
+    |> render(number: number, name: name)
     |> put("Accounts", timeout)
     |> did_create_account()
   end
+
+  defp truncate(string, length) when byte_size(string) > length do
+    String.slice(string, 0..length - 4) <> "..."
+  end
+  defp truncate(string, _length), do: string
 
   defp did_create_account({:ok, %{status_code: 200}}), do: :ok
   defp did_create_account({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do

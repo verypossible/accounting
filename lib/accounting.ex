@@ -13,8 +13,8 @@ defmodule Accounting do
     adapter().register_categories(categories, timeout)
   end
 
-  @spec create_account(String.t, timeout) :: :ok | {:error, any}
-  def create_account(number, timeout \\ @default_timeout), do: adapter().create_account(number, timeout)
+  @spec create_account(String.t, String.t, timeout) :: :ok | {:error, any}
+  def create_account(number, description, timeout \\ @default_timeout), do: adapter().create_account(number, description, timeout)
 
   @spec receive_money(String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, any}
   def receive_money(from, date, line_items, timeout \\ @default_timeout) do
