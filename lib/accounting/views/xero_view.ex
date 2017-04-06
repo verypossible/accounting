@@ -116,7 +116,7 @@ defmodule Accounting.XeroView do
     """
     <Account>
       <Code>#{xml_escape assigns[:number]}</Code>
-      <Name>#{xml_escape assigns[:number]}</Name>
+      <Name>#{xml_escape assigns[:name]}</Name>
       <Type>CURRLIAB</Type>
     </Account>
     """

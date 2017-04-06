@@ -17,7 +17,7 @@ defmodule Accounting.TestAdapter do
     end
   end
 
-  def create_account(number, _timeout) do
+  def create_account(number, _description, _timeout) do
     send self(), {:created_account, number}
 
     if exists?(number) do
