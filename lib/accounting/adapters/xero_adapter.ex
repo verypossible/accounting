@@ -6,6 +6,8 @@ defmodule Accounting.XeroAdapter do
 
   @behaviour Accounting.Adapter
 
+  @typep offset :: non_neg_integer
+
   @rate_limit_delay 1_000
   @xero_name_char_limit 150
 
@@ -186,6 +188,7 @@ defmodule Accounting.XeroAdapter do
     end, timeout
   end
 
+  @spec fetch_new(offset, map, timeout) :: {:ok, map, offset} | {:error, term}
   defp fetch_new(offset, acc, timeout) do
     case get("Journals", timeout, offset: offset) do
       {:ok, %{body: "{" <> _ = json}} ->
@@ -202,6 +205,14 @@ defmodule Accounting.XeroAdapter do
         else
           {:ok, transactions, next_offset(journals) || offset}
         end
+
+      {:ok, %{headers: headers, status_code: 503}} ->
+        case :proplists.get_value("X-Rate-Limit-Problem", headers) do
+          "Minute" -> {:error, {:rate_limit_exceeded, :minute}}
+          "Daily" -> {:error, {:rate_limit_exceeded, :day}}
+          :undefined -> {:error, :rate_limit_exceeded}
+        end
+
       {_, reasons} ->
         {:error, reasons}
     end

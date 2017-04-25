@@ -9,14 +9,14 @@ defmodule Accounting.Mixfile do
       description: "Accounting.",
       elixir: "~> 1.4",
       package: package(),
-      version: "0.4.0",
+      version: "0.4.1",
       start_permanent: Mix.env === :prod,
     ]
   end
 
   defp deps do
     [
-      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:httpoison, "~> 0.9"},
       {:oauther, "~> 1.1.0"},
       {:poison, "~> 2.2 or ~> 3.0"},
