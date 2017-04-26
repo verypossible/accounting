@@ -6,7 +6,9 @@ defmodule Accounting.XeroAdapter do
 
   @behaviour Accounting.Adapter
 
+  @typep journal :: %{required(binary) => any}
   @typep offset :: non_neg_integer
+  @typep transactions :: %{optional(String.t) => [Accounting.AccountTransaction.t]}
 
   @rate_limit_delay 1_000
   @xero_name_char_limit 150
@@ -19,14 +21,17 @@ defmodule Accounting.XeroAdapter do
       memo = Agent.get(pid, &Map.fetch!(&1, :memo))
       Agent.cast memo, fn _ ->
         case fetch_new(0, %{}, 15_000) do
-          {:ok, txns, offset} -> %{next_offset: offset, transactions: txns}
-          _ -> %{next_offset: 0, transactions: %{}}
+          {:ok, txns, offset} ->
+            %{next_offset: offset, transactions: txns, updated: now()}
+          _ ->
+            %{next_offset: 0, transactions: %{}, updated: now()}
         end
       end
       {:ok, pid}
     end
   end
 
+  @spec start_link(String.t) :: Agent.on_start
   defp start_link(tracking_category_id) do
     Agent.start_link fn ->
       {:ok, memo} = Agent.start_link(fn -> nil end)
@@ -34,12 +39,14 @@ defmodule Accounting.XeroAdapter do
     end, name: __MODULE__
   end
 
+  @spec ensure_tracking_category_exists() :: {:ok, String.t} | {:error, term}
   defp ensure_tracking_category_exists() do
     "TrackingCategories/Category"
     |> get(5_000)
     |> ensure_tracking_category_exists()
   end
 
+  @spec ensure_tracking_category_exists({:ok | :error, term}) :: {:ok, String.t} | {:error, term}
   defp ensure_tracking_category_exists({:ok, %{status_code: 200, body: "{" <> _ = json}}) do
     tracking_category_id =
       json
@@ -67,6 +74,7 @@ defmodule Accounting.XeroAdapter do
     |> did_register_categories()
   end
 
+  @spec did_register_categories({:ok | :error, term}) :: :ok | {:error, term}
   defp did_register_categories({:ok, %{status_code: 200}}), do: :ok
   defp did_register_categories({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
     duplication_error = %{
@@ -91,11 +99,13 @@ defmodule Accounting.XeroAdapter do
     |> did_create_account()
   end
 
+  @spec truncate(String.t, integer) :: String.t
   defp truncate(string, length) when byte_size(string) > length do
     String.slice(string, 0..length - 4) <> "..."
   end
   defp truncate(string, _length), do: string
 
+  @spec did_create_account({:ok | :error, term}) :: :ok | {:error, term}
   defp did_create_account({:ok, %{status_code: 200}}), do: :ok
   defp did_create_account({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
     duplication_error = %{"Message" => "Please enter a unique Code."}
@@ -108,6 +118,7 @@ defmodule Accounting.XeroAdapter do
   end
   defp did_create_account({_, reasons}), do: {:error, reasons}
 
+  @spec validation_errors(String.t | map) :: [String.t]
   defp validation_errors(json) when is_binary(json) do
     json
     |> Poison.decode!()
@@ -122,6 +133,7 @@ defmodule Accounting.XeroAdapter do
     |> do_receive_money(from, date, line_items, timeout)
   end
 
+  @spec do_receive_money(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
   defp do_receive_money(0, from, date, line_items, timeout) do
     "transfer.xml"
     |> render(from: from, date: date, line_items: line_items)
@@ -135,12 +147,16 @@ defmodule Accounting.XeroAdapter do
     |> did_receive_money()
   end
 
+  defp did_receive_money({:ok, %{status_code: 200}}), do: :ok
+  defp did_receive_money({_, reasons}), do: {:error, reasons}
+
   def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items, timeout) do
     line_items
     |> Enum.reduce(0, & &1.amount + &2)
     |> do_spend_money(to, date, line_items, timeout)
   end
 
+  @spec do_spend_money(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
   defp do_spend_money(0, to, date, line_items, timeout) do
     "transfer.xml"
     |> render(to: to, date: date, line_items: line_items)
@@ -154,15 +170,15 @@ defmodule Accounting.XeroAdapter do
     |> did_spend_money()
   end
 
-  defp did_transfer({:ok, %{status_code: 200}}), do: :ok
-  defp did_transfer({_, reasons}), do: {:error, reasons}
-
-  defp did_receive_money({:ok, %{status_code: 200}}), do: :ok
-  defp did_receive_money({_, reasons}), do: {:error, reasons}
-
+  @spec did_receive_money({:ok | :error, term}) :: :ok | {:error, term}
   defp did_spend_money({:ok, %{status_code: 200}}), do: :ok
   defp did_spend_money({_, reasons}), do: {:error, reasons}
 
+  @spec did_transfer({:ok | :error, term}) :: :ok | {:error, term}
+  defp did_transfer({:ok, %{status_code: 200}}), do: :ok
+  defp did_transfer({_, reasons}), do: {:error, reasons}
+
+  @spec put(String.t, String.t, timeout) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
   defp put(xml, endpoint, timeout) do
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}"
     {oauth_header, _} =
@@ -177,13 +193,22 @@ defmodule Accounting.XeroAdapter do
   def fetch_account_transactions(number, timeout) when is_binary(number) do
     memo = Agent.get(__MODULE__, &Map.fetch!(&1, :memo), timeout)
     Agent.get_and_update memo, fn state ->
-      case fetch_new(state.next_offset, state.transactions, timeout) do
-        {:ok, txns, offset} ->
-          value = {:ok, Enum.reverse(txns[number] || [])}
-          new_state = %{transactions: txns, next_offset: offset}
-          {value, new_state}
-        error ->
-          {error, state}
+      if state.updated !== now() do
+        case fetch_new(state.next_offset, state.transactions, timeout) do
+          {:ok, txns, offset} ->
+            value = {:ok, Enum.reverse(txns[number] || [])}
+            new_state = %{
+              transactions: txns,
+              next_offset: offset,
+              updated: now(),
+            }
+            {value, new_state}
+          error ->
+            {error, state}
+        end
+      else
+        value = {:ok, Enum.reverse(state.transactions[number] || [])}
+        {value, state}
       end
     end, timeout
   end
@@ -218,6 +243,10 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
+  @spec now() :: integer
+  defp now, do: :erlang.system_time(:seconds)
+
+  @spec import_journal(journal, transactions) :: transactions
   defp import_journal(journal, transactions) do
     Enum.reduce journal["JournalLines"], transactions, fn
       %{"AccountCode" => account_number} = line, acc ->
@@ -232,6 +261,7 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
+  @spec date(String.t) :: Date.t
   defp date(xero_date) do
     [_, milliseconds] = Regex.run(~r/\/Date\((-?\d+)\+0000\)\//, xero_date)
 
@@ -241,6 +271,7 @@ defmodule Accounting.XeroAdapter do
     |> DateTime.to_date()
   end
 
+  @spec next_offset([journal]) :: offset
   defp next_offset([]), do: nil
   defp next_offset(journals) do
     journals
@@ -248,6 +279,7 @@ defmodule Accounting.XeroAdapter do
     |> Map.fetch!("JournalNumber")
   end
 
+  @spec get(String.t, timeout, [any]) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
   defp get(endpoint, timeout, params \\ []) do
     query = URI.encode_query(params)
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}?#{query}"
@@ -260,6 +292,7 @@ defmodule Accounting.XeroAdapter do
       recv_timeout: timeout
   end
 
+  @spec credentials() :: OAuther.Credentials.t
   defp credentials do
     consumer_secret = Application.get_env(:accounting, :consumer_secret)
     consumer_key    = Application.get_env(:accounting, :consumer_key)

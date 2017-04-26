@@ -2,8 +2,6 @@ defmodule Accounting.HelpersTest do
   use ExUnit.Case, async: true
   doctest Accounting.Helpers
 
-  Application.put_env(:accounting, :adapter, Accounting.TestAdapter)
-
   alias Accounting.{AccountTransaction, Helpers}
 
   describe "calculate_balance/1" do

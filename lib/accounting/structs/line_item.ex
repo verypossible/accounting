@@ -1,5 +1,5 @@
 defmodule Accounting.LineItem do
-  @type t :: %Accounting.LineItem{}
+  @type t :: %__MODULE__{}
 
   defstruct [:description, :amount, :account_number, category: :other]
 end

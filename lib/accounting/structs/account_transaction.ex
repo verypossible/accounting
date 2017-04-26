@@ -1,5 +1,5 @@
 defmodule Accounting.AccountTransaction do
-  @type t :: %Accounting.AccountTransaction{}
+  @type t :: %__MODULE__{}
 
   defstruct [:amount, :description, :date]
 end
