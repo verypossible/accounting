@@ -2,8 +2,6 @@ defmodule Accounting.XeroAdapter do
   alias Accounting.AccountTransaction
   import Accounting.XeroView, only: [render: 1, render: 2]
 
-  @moduledoc false
-
   @behaviour Accounting.Adapter
 
   @typep journal :: %{required(binary) => any}
@@ -15,10 +13,21 @@ defmodule Accounting.XeroAdapter do
 
   ## Callbacks
 
-  def start_link do
-    with {:ok, category_id} <- ensure_tracking_category_exists(),
-         {:ok, pid}         <- start_link(category_id) do
-      memo = Agent.get(pid, &Map.fetch!(&1, :memo))
+  def start_link(opts) do
+    consumer_key = Keyword.fetch!(opts, :consumer_key)
+    credentials = %OAuther.Credentials{
+      consumer_key: consumer_key,
+      consumer_secret: Keyword.fetch!(opts, :consumer_secret),
+      token: consumer_key,
+      method: :rsa_sha1,
+    }
+    config = %{
+      bank_account_id: Keyword.fetch!(opts, :bank_account_id),
+      credentials: credentials,
+    }
+    with {:ok, category_id} <- ensure_tracking_category_exists(credentials),
+         {:ok, pid}         <- do_start_link(category_id, config) do
+      memo = Agent.get(pid, & &1.memo)
       Agent.cast memo, fn _ ->
         case fetch_new(0, %{}, 15_000) do
           {:ok, txns, offset} ->
@@ -31,23 +40,28 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
-  @spec start_link(String.t) :: Agent.on_start
-  defp start_link(tracking_category_id) do
+  @spec do_start_link(String.t, config :: %{bank_account_id: String.t, credentials: OAuther.Credentials.t}) :: Agent.on_start
+  defp do_start_link(tracking_category_id, config) do
     Agent.start_link fn ->
       {:ok, memo} = Agent.start_link(fn -> nil end)
-      %{tracking_category_id: tracking_category_id, memo: memo}
+      %{
+        bank_account_id: config.bank_account_id,
+        credentials: config.credentials,
+        memo: memo,
+        tracking_category_id: tracking_category_id,
+      }
     end, name: __MODULE__
   end
 
-  @spec ensure_tracking_category_exists() :: {:ok, String.t} | {:error, term}
-  defp ensure_tracking_category_exists() do
+  @spec ensure_tracking_category_exists(OAuther.Credentials.t) :: {:ok, String.t} | {:error, term}
+  defp ensure_tracking_category_exists(credentials) do
     "TrackingCategories/Category"
-    |> get(5_000)
-    |> ensure_tracking_category_exists()
+    |> get(5_000, credentials)
+    |> ensure_tracking_category_exists(credentials)
   end
 
-  @spec ensure_tracking_category_exists({:ok | :error, term}) :: {:ok, String.t} | {:error, term}
-  defp ensure_tracking_category_exists({:ok, %{status_code: 200, body: "{" <> _ = json}}) do
+  @spec ensure_tracking_category_exists({:ok | :error, term}, OAuther.Credentials.t) :: {:ok, String.t} | {:error, term}
+  defp ensure_tracking_category_exists({:ok, %{status_code: 200, body: "{" <> _ = json}}, _credentials) do
     tracking_category_id =
       json
       |> Poison.decode!()
@@ -57,20 +71,22 @@ defmodule Accounting.XeroAdapter do
 
     {:ok, tracking_category_id}
   end
-  defp ensure_tracking_category_exists({:ok, %{status_code: 404}}) do
+  defp ensure_tracking_category_exists({:ok, %{status_code: 404}}, credentials) do
     "start_link.xml"
     |> render()
-    |> put("TrackingCategories", 5_000)
-    |> ensure_tracking_category_exists()
+    |> put("TrackingCategories", 5_000, credentials)
+    |> ensure_tracking_category_exists(credentials)
   end
-  defp ensure_tracking_category_exists({_, reasons}), do: {:error, reasons}
+  defp ensure_tracking_category_exists({_, reasons}, _credentials) do
+    {:error, reasons}
+  end
 
   def register_categories(categories, timeout) when is_list(categories) do
-    id = Agent.get(__MODULE__, &Map.fetch!(&1, :tracking_category_id), timeout)
+    id = Agent.get(__MODULE__, & &1.tracking_category_id, timeout)
 
     "register_categories.xml"
     |> render(categories: categories)
-    |> put("TrackingCategories/#{id}/Options", timeout)
+    |> put("TrackingCategories/#{id}/Options", timeout, credentials())
     |> did_register_categories()
   end
 
@@ -95,7 +111,7 @@ defmodule Accounting.XeroAdapter do
 
     "create_account.xml"
     |> render(number: number, name: name)
-    |> put("Accounts", timeout)
+    |> put("Accounts", timeout, credentials())
     |> did_create_account()
   end
 
@@ -136,14 +152,21 @@ defmodule Accounting.XeroAdapter do
   @spec do_receive_money(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
   defp do_receive_money(0, from, date, line_items, timeout) do
     "transfer.xml"
-    |> render(from: from, date: date, line_items: line_items)
-    |> put("Invoices", timeout)
+    |> render(date: date, from: from, line_items: line_items)
+    |> put("Invoices", timeout, credentials())
     |> did_transfer()
   end
   defp do_receive_money(_, from, date, line_items, timeout) do
+    assigns = [
+      bank_account_id: bank_account_id(),
+      date: date,
+      from: from,
+      line_items: line_items,
+    ]
+
     "receive_money.xml"
-    |> render(from: from, date: date, line_items: line_items)
-    |> put("BankTransactions", timeout)
+    |> render(assigns)
+    |> put("BankTransactions", timeout, credentials())
     |> did_receive_money()
   end
 
@@ -159,14 +182,21 @@ defmodule Accounting.XeroAdapter do
   @spec do_spend_money(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
   defp do_spend_money(0, to, date, line_items, timeout) do
     "transfer.xml"
-    |> render(to: to, date: date, line_items: line_items)
-    |> put("Invoices", timeout)
+    |> render(date: date, to: to, line_items: line_items)
+    |> put("Invoices", timeout, credentials())
     |> did_transfer()
   end
   defp do_spend_money(_, to, date, line_items, timeout) do
+    assigns = [
+      bank_account_id: bank_account_id(),
+      date: date,
+      line_items: line_items,
+      to: to,
+    ]
+
     "spend_money.xml"
-    |> render(to: to, date: date, line_items: line_items)
-    |> put("BankTransactions", timeout)
+    |> render(assigns)
+    |> put("BankTransactions", timeout, credentials())
     |> did_spend_money()
   end
 
@@ -178,12 +208,15 @@ defmodule Accounting.XeroAdapter do
   defp did_transfer({:ok, %{status_code: 200}}), do: :ok
   defp did_transfer({_, reasons}), do: {:error, reasons}
 
-  @spec put(String.t, String.t, timeout) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
-  defp put(xml, endpoint, timeout) do
+  @spec bank_account_id() :: String.t
+  defp bank_account_id, do: Agent.get(__MODULE__, & &1.bank_account_id)
+
+  @spec put(String.t, String.t, timeout, OAuther.Credentials.t) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
+  defp put(xml, endpoint, timeout, credentials) do
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}"
     {oauth_header, _} =
       "put"
-      |> OAuther.sign(url, [], credentials())
+      |> OAuther.sign(url, [], credentials)
       |> OAuther.header()
 
     HTTPoison.put url, xml, [oauth_header, {"Accept", "application/json"}],
@@ -191,31 +224,32 @@ defmodule Accounting.XeroAdapter do
   end
 
   def fetch_account_transactions(number, timeout) when is_binary(number) do
-    memo = Agent.get(__MODULE__, &Map.fetch!(&1, :memo), timeout)
-    Agent.get_and_update memo, fn state ->
-      if state.updated !== now() do
-        case fetch_new(state.next_offset, state.transactions, timeout) do
-          {:ok, txns, offset} ->
-            value = {:ok, Enum.reverse(txns[number] || [])}
-            new_state = %{
-              transactions: txns,
-              next_offset: offset,
-              updated: now(),
-            }
-            {value, new_state}
-          error ->
-            {error, state}
+    memo = Agent.get(__MODULE__, & &1.memo, timeout)
+    Agent.get_and_update memo, fn
+      %{next_offset: offset, transactions: txns, updated: updated} = state ->
+        if updated !== now() do
+          case fetch_new(offset, txns, timeout) do
+            {:ok, new_txns, new_offset} ->
+              value = {:ok, Enum.reverse(new_txns[number] || [])}
+              new_state = %{
+                transactions: new_txns,
+                next_offset: new_offset,
+                updated: now(),
+              }
+              {value, new_state}
+            error ->
+              {error, state}
+          end
+        else
+          value = {:ok, Enum.reverse(txns[number] || [])}
+          {value, state}
         end
-      else
-        value = {:ok, Enum.reverse(state.transactions[number] || [])}
-        {value, state}
-      end
     end, timeout
   end
 
   @spec fetch_new(offset, map, timeout) :: {:ok, map, offset} | {:error, term}
   defp fetch_new(offset, acc, timeout) do
-    case get("Journals", timeout, offset: offset) do
+    case get("Journals", timeout, credentials(), offset: offset) do
       {:ok, %{body: "{" <> _ = json}} ->
         journals =
           json
@@ -279,13 +313,13 @@ defmodule Accounting.XeroAdapter do
     |> Map.fetch!("JournalNumber")
   end
 
-  @spec get(String.t, timeout, [any]) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
-  defp get(endpoint, timeout, params \\ []) do
+  @spec get(String.t, timeout, OAuther.Credentials.t, [any]) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
+  defp get(endpoint, timeout, credentials, params \\ []) do
     query = URI.encode_query(params)
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}?#{query}"
     {oauth_header, _} =
       "get"
-      |> OAuther.sign(url, [], credentials())
+      |> OAuther.sign(url, [], credentials)
       |> OAuther.header()
 
     HTTPoison.get url, [oauth_header, {"Accept", "application/json"}],
@@ -293,14 +327,5 @@ defmodule Accounting.XeroAdapter do
   end
 
   @spec credentials() :: OAuther.Credentials.t
-  defp credentials do
-    consumer_secret = Application.get_env(:accounting, :consumer_secret)
-    consumer_key    = Application.get_env(:accounting, :consumer_key)
-    %OAuther.Credentials{
-      consumer_key: consumer_key,
-      consumer_secret: consumer_secret,
-      token: consumer_key,
-      method: :rsa_sha1,
-    }
-  end
+  defp credentials, do: Agent.get(__MODULE__, & &1.credentials)
 end

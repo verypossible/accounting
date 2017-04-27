@@ -40,9 +40,7 @@ defmodule Accounting.XeroView do
             end}
         </LineItems>
         <BankAccount>
-          <AccountID>
-            #{Application.get_env(:accounting, :bank_account_id)}
-          </AccountID>
+          <AccountID>#{xml_escape assigns[:bank_account_id]}</AccountID>
         </BankAccount>
       </BankTransaction>
     </BankTransactions>
@@ -61,9 +59,7 @@ defmodule Accounting.XeroView do
             end}
         </LineItems>
         <BankAccount>
-          <AccountID>
-            #{Application.get_env(:accounting, :bank_account_id)}
-          </AccountID>
+          <AccountID>#{xml_escape assigns[:bank_account_id]}</AccountID>
         </BankAccount>
       </BankTransaction>
     </BankTransactions>

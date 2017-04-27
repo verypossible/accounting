@@ -1,15 +1,13 @@
 defmodule Accounting.TestAdapter do
   @behaviour Accounting.Adapter
 
-  @moduledoc false
-
   alias Accounting.AccountTransaction
 
   def reset, do: Agent.update(__MODULE__, fn _ -> %{} end)
 
   ## Callbacks
 
-  def start_link, do: Agent.start_link(&Map.new/0, name: __MODULE__)
+  def start_link(_opts), do: Agent.start_link(&Map.new/0, name: __MODULE__)
 
   def register_categories(categories, _timeout) do
     Enum.each categories, fn category ->

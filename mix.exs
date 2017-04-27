@@ -9,7 +9,7 @@ defmodule Accounting.Mixfile do
       description: "Accounting.",
       elixir: "~> 1.4",
       package: package(),
-      version: "0.4.2",
+      version: "0.5.0",
       start_permanent: Mix.env === :prod,
     ]
   end
@@ -31,6 +31,4 @@ defmodule Accounting.Mixfile do
       links: %{"GitHub" => "https://github.com/spartansystems/accounting"},
     ]
   end
-
-  def application, do: [mod: {Accounting.Application, []}]
 end
