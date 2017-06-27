@@ -143,70 +143,49 @@ defmodule Accounting.XeroAdapter do
   defp validation_errors(%{"Elements" => [%{"ValidationErrors" => e}|_]}), do: e
   defp validation_errors(%{}), do: []
 
-  def receive_money(<<_::binary>> = from, %Date{} = date, [_|_] = line_items, timeout) do
+  def transact(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, timeout) do
     line_items
     |> Enum.reduce(0, & &1.amount + &2)
-    |> do_receive_money(from, date, line_items, timeout)
+    |> transact(party, date, line_items, timeout)
   end
 
-  @spec do_receive_money(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
-  defp do_receive_money(0, from, date, line_items, timeout) do
+  @spec transact(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
+  defp transact(0, party, date, line_items, timeout) do
     "transfer.xml"
-    |> render(date: date, from: from, line_items: line_items)
+    |> render(date: date, line_items: line_items, party: party)
     |> put("Invoices", timeout, credentials())
-    |> did_transfer()
+    |> did_transact()
   end
-  defp do_receive_money(_, from, date, line_items, timeout) do
+  defp transact(total, party, date, line_items, timeout) when total < 0 do
     assigns = [
       bank_account_id: bank_account_id(),
       date: date,
-      from: from,
-      line_items: line_items,
+      line_items: for(l <- line_items, do: %{l | amount: -l.amount}),
+      party: party,
     ]
 
-    "receive_money.xml"
+    "debit.xml"
     |> render(assigns)
     |> put("BankTransactions", timeout, credentials())
-    |> did_receive_money()
+    |> did_transact()
   end
-
-  defp did_receive_money({:ok, %{status_code: 200}}), do: :ok
-  defp did_receive_money({_, reasons}), do: {:error, reasons}
-
-  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items, timeout) do
-    line_items
-    |> Enum.reduce(0, & &1.amount + &2)
-    |> do_spend_money(to, date, line_items, timeout)
-  end
-
-  @spec do_spend_money(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
-  defp do_spend_money(0, to, date, line_items, timeout) do
-    "transfer.xml"
-    |> render(date: date, to: to, line_items: line_items)
-    |> put("Invoices", timeout, credentials())
-    |> did_transfer()
-  end
-  defp do_spend_money(_, to, date, line_items, timeout) do
+  defp transact(_, party, date, line_items, timeout) do
     assigns = [
       bank_account_id: bank_account_id(),
       date: date,
       line_items: line_items,
-      to: to,
+      party: party,
     ]
 
-    "spend_money.xml"
+    "credit.xml"
     |> render(assigns)
     |> put("BankTransactions", timeout, credentials())
-    |> did_spend_money()
+    |> did_transact()
   end
 
-  @spec did_receive_money({:ok | :error, term}) :: :ok | {:error, term}
-  defp did_spend_money({:ok, %{status_code: 200}}), do: :ok
-  defp did_spend_money({_, reasons}), do: {:error, reasons}
-
-  @spec did_transfer({:ok | :error, term}) :: :ok | {:error, term}
-  defp did_transfer({:ok, %{status_code: 200}}), do: :ok
-  defp did_transfer({_, reasons}), do: {:error, reasons}
+  @spec did_transact({:ok | :error, term}) :: :ok | {:error, term}
+  defp did_transact({:ok, %{status_code: 200}}), do: :ok
+  defp did_transact({_, reasons}), do: {:error, reasons}
 
   @spec bank_account_id() :: String.t
   defp bank_account_id, do: Agent.get(__MODULE__, & &1.bank_account_id)

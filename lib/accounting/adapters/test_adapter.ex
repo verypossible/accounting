@@ -29,9 +29,9 @@ defmodule Accounting.TestAdapter do
     Agent.get(__MODULE__, &Map.has_key?(&1, account_number))
   end
 
-  def receive_money(<<_::binary>> = from, %Date{} = date, [_|_] = line_items, _timeout) do
+  def transact(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, _timeout) do
     Enum.each line_items, fn item ->
-      send self(), {:received_money, from, date, item}
+      send self(), {:transaction, party, date, item}
     end
 
     if all_exist?(for i <- line_items, do: i.account_number) do
@@ -40,28 +40,6 @@ defmodule Accounting.TestAdapter do
           number = item.account_number
           transaction = %AccountTransaction{
             amount: item.amount,
-            description: item.description,
-            date: date,
-          }
-          Map.update!(acc, number, &List.insert_at(&1, 0, transaction))
-        end
-      end
-    else
-      {:error, :no_such_account}
-    end
-  end
-
-  def spend_money(<<_::binary>> = to, %Date{} = date, [_|_] = line_items, _timeout) do
-    Enum.each line_items, fn item ->
-      send self(), {:spent_money, to, date, item}
-    end
-
-    if all_exist?(for i <- line_items, do: i.account_number) do
-      Agent.update __MODULE__, fn state ->
-        Enum.reduce line_items, state, fn item, acc ->
-          number = item.account_number
-          transaction = %AccountTransaction{
-            amount: -item.amount,
             description: item.description,
             date: date,
           }

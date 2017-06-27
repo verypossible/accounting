@@ -27,12 +27,12 @@ defmodule Accounting.XeroView do
     </Option>
     """
   end
-  def render("receive_money.xml", assigns) do
+  def render("credit.xml", assigns) do
     """
     <BankTransactions>
       <BankTransaction>
         <Type>RECEIVE</Type>
-        <Contact><Name>#{xml_escape assigns[:from]}</Name></Contact>
+        <Contact><Name>#{xml_escape assigns[:party]}</Name></Contact>
         <Date>#{assigns[:date]}</Date>
         <LineItems>
           #{for line_item <- assigns[:line_items] do
@@ -46,12 +46,12 @@ defmodule Accounting.XeroView do
     </BankTransactions>
     """
   end
-  def render("spend_money.xml", assigns) do
+  def render("debit.xml", assigns) do
     """
     <BankTransactions>
       <BankTransaction>
         <Type>SPEND</Type>
-        <Contact><Name>#{xml_escape assigns[:to]}</Name></Contact>
+        <Contact><Name>#{xml_escape assigns[:party]}</Name></Contact>
         <Date>#{assigns[:date]}</Date>
         <LineItems>
           #{for line_item <- assigns[:line_items] do
@@ -71,7 +71,7 @@ defmodule Accounting.XeroView do
       <Invoice>
         <Type>ACCREC</Type>
         <Status>AUTHORISED</Status>
-        <Contact><Name>#{xml_escape assigns[:from]}</Name></Contact>
+        <Contact><Name>#{xml_escape assigns[:party]}</Name></Contact>
         <Date>#{assigns[:date]}</Date>
         <DueDate>#{assigns[:date]}</DueDate>
         <LineAmountTypes>NoTax</LineAmountTypes>

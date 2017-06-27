@@ -55,19 +55,14 @@ defmodule Accounting do
     end
   end
 
-  @spec receive_money(String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
-  def receive_money(from, date, line_items, timeout \\ @default_timeout) do
-    adapter().receive_money(from, date, filter_line_items(line_items), timeout)
-  end
-
   @spec register_categories([atom], timeout) :: :ok | {:error, term}
   def register_categories(categories, timeout \\ @default_timeout) do
     adapter().register_categories(categories, timeout)
   end
 
-  @spec spend_money(String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
-  def spend_money(to, date, line_items, timeout \\ @default_timeout) do
-    adapter().spend_money(to, date, filter_line_items(line_items), timeout)
+  @spec transact(String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
+  def transact(party, date, line_items, timeout \\ @default_timeout) do
+    adapter().transact(party, date, filter_line_items(line_items), timeout)
   end
 
   @spec filter_line_items([Accounting.LineItem.t]) :: [Accounting.LineItem.t]
