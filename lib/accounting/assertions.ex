@@ -23,49 +23,25 @@ defmodule Accounting.Assertions do
     end
   end
 
-  @spec assert_received_money_with_line_item(String.t, Date.t, [Accounting.LineItem.t]) :: true | no_return
-  def assert_received_money_with_line_item(from, date, line_item) do
+  @spec assert_transaction_with_line_item(String.t, Date.t, [Accounting.LineItem.t]) :: true | no_return
+  def assert_transaction_with_line_item(party, date, line_item) do
     receive do
-      {:received_money, ^from, ^date, ^line_item} -> true
+      {:transaction, ^party, ^date, ^line_item} -> true
     after
       @timeout ->
         flunk """
-        Money was not received from '#{from}' on #{date} with the line item:
+        Transaction did not occur with '#{party}' on #{date} with the line item:
 
         #{inspect line_item}
         """
     end
   end
 
-  @spec refute_received_money(String.t, Date.t) :: true | no_return
-  def refute_received_money(from, date) do
+  @spec refute_transaction(String.t, Date.t) :: true | no_return
+  def refute_transaction(from, date) do
     receive do
-      {:received_money, ^from, ^date, _} ->
-        flunk "Money was unexpectedly received."
-    after
-      @timeout -> true
-    end
-  end
-
-  @spec assert_spent_money_with_line_item(String.t, Date.t, [Accounting.LineItem.t]) :: true | no_return
-  def assert_spent_money_with_line_item(to, date, line_item) do
-    receive do
-      {:spent_money, ^to, ^date, ^line_item} -> true
-    after
-      @timeout ->
-        flunk """
-        Money was not spent towards '#{to}' on #{date} with the line item:
-
-        #{inspect line_item}
-        """
-    end
-  end
-
-  @spec refute_spent_money(String.t, Date.t) :: true | no_return
-  def refute_spent_money(to, date) do
-    receive do
-      {:spent_money, ^to, ^date, _} ->
-        flunk "Money was unexpectedly spent."
+      {:transaction, ^from, ^date, _} ->
+        flunk "Unexepcted transaction occurred."
     after
       @timeout -> true
     end
