@@ -26,9 +26,9 @@ defmodule Accounting.Mixfile do
 
   defp package do
     [
-      maintainers: ["Spartan"],
+      maintainers: ["Very"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/spartansystems/accounting"},
+      links: %{"GitHub" => "https://github.com/verypossible/accounting"},
     ]
   end
 end
