@@ -3,11 +3,11 @@ defmodule Accounting.Account do
   An account data structure and functions.
   """
 
-  alias Accounting.Transaction
+  alias Accounting.AccountTransaction
 
   @type no :: String.t
 
-  @opaque t :: %__MODULE__{number: no, transactions: [Transaction.t]}
+  @opaque t :: %__MODULE__{number: no, transactions: [AccountTransaction.t]}
 
   defstruct [:number, {:transactions, []}]
 
@@ -69,7 +69,7 @@ defmodule Accounting.Account do
     balance
   end
 
-  @spec transactions(t) :: [Transaction.t]
+  @spec transactions(t) :: [AccountTransaction.t]
   def transactions(account), do: account.transactions
 
   defimpl Inspect do

@@ -7,6 +7,9 @@ defmodule Accounting.TestAdapter do
   @typep transactions :: %{optional(String.t) => [AccountTransaction.t]}
 
   @impl Adapter
+  def child_spec(opts), do: Supervisor.Spec.worker(__MODULE__, [opts])
+
+  @impl Adapter
   def fetch_accounts(numbers, _timeout) do
     {:ok, Agent.get(__MODULE__, &get_accounts(&1, numbers))}
   end

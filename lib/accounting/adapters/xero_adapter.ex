@@ -12,12 +12,16 @@ defmodule Accounting.XeroAdapter do
 
   @behaviour Adapter
 
+  @typep credentials :: %OAuther.Credentials{method: :rsa_sha1, token_secret: nil}
   @typep journal :: %{required(binary) => any}
   @typep offset :: non_neg_integer
   @typep transactions :: %{optional(String.t) => [AccountTransaction.t]}
 
   @rate_limit_delay 1_000
   @xero_name_char_limit 150
+
+  @impl Adapter
+  def child_spec(opts), do: Supervisor.Spec.worker(__MODULE__, [opts])
 
   @impl Adapter
   def start_link(opts) do
@@ -47,7 +51,7 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
-  @spec do_start_link(String.t, config :: %{bank_account_id: String.t, credentials: OAuther.Credentials.t}) :: Agent.on_start
+  @spec do_start_link(String.t, config :: %{bank_account_id: String.t, credentials: %OAuther.Credentials{}}) :: Agent.on_start
   defp do_start_link(tracking_category_id, config) do
     Agent.start_link fn ->
       {:ok, memo} = Agent.start_link(fn -> nil end)
@@ -60,14 +64,14 @@ defmodule Accounting.XeroAdapter do
     end, name: __MODULE__
   end
 
-  @spec ensure_tracking_category_exists(OAuther.Credentials.t) :: {:ok, String.t} | {:error, term}
+  @spec ensure_tracking_category_exists(credentials) :: {:ok, String.t} | {:error, term}
   defp ensure_tracking_category_exists(credentials) do
     "TrackingCategories/Category"
     |> get(5_000, credentials)
     |> ensure_tracking_category_exists(credentials)
   end
 
-  @spec ensure_tracking_category_exists({:ok | :error, term}, OAuther.Credentials.t) :: {:ok, String.t} | {:error, term}
+  @spec ensure_tracking_category_exists({:ok | :error, term}, %OAuther.Credentials{}) :: {:ok, String.t} | {:error, term}
   defp ensure_tracking_category_exists({:ok, %{status_code: 200, body: "{" <> _ = json}}, _credentials) do
     tracking_category_id =
       json
@@ -98,7 +102,7 @@ defmodule Accounting.XeroAdapter do
     |> did_register_categories()
   end
 
-  @spec did_register_categories({:ok | :error, term}) :: :ok | {:error, term}
+  @spec did_register_categories({:ok, HTTPoison.Response.t} | {:error, HTTPoison.Error.t}) :: :ok | {:error, :duplicate | HTTPoison.Error.t}
   defp did_register_categories({:ok, %{status_code: 200}}), do: :ok
   defp did_register_categories({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
     duplication_error = %{
@@ -130,7 +134,7 @@ defmodule Accounting.XeroAdapter do
   end
   defp truncate(string, _length), do: string
 
-  @spec did_register_account({:ok | :error, term}) :: :ok | {:error, term}
+  @spec did_register_account({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}) :: :ok | {:error, :duplicate | HTTPoison.Error.t}
   defp did_register_account({:ok, %{status_code: 200}}), do: :ok
   defp did_register_account({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
     duplication_error = %{"Message" => "Please enter a unique Code."}
@@ -193,14 +197,14 @@ defmodule Accounting.XeroAdapter do
     |> did_record_entry()
   end
 
-  @spec did_record_entry({:ok | :error, term}) :: :ok | {:error, term}
+  @spec did_record_entry({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}) :: :ok | {:error, :duplicate | HTTPoison.Error.t}
   defp did_record_entry({:ok, %{status_code: 200}}), do: :ok
   defp did_record_entry({_, reasons}), do: {:error, reasons}
 
   @spec bank_account_id() :: String.t
   defp bank_account_id, do: Agent.get(__MODULE__, & &1.bank_account_id)
 
-  @spec put(String.t, String.t, timeout, OAuther.Credentials.t) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
+  @spec put(String.t, String.t, timeout, %OAuther.Credentials{}) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
   defp put(xml, endpoint, timeout, credentials) do
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}"
     {oauth_header, _} =
@@ -309,7 +313,7 @@ defmodule Accounting.XeroAdapter do
     |> DateTime.to_date()
   end
 
-  @spec next_offset([journal]) :: offset
+  @spec next_offset([journal]) :: offset | nil
   defp next_offset([]), do: nil
   defp next_offset(journals) do
     journals
@@ -317,7 +321,7 @@ defmodule Accounting.XeroAdapter do
     |> Map.fetch!("JournalNumber")
   end
 
-  @spec get(String.t, timeout, OAuther.Credentials.t, [any]) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
+  @spec get(String.t, timeout, credentials, keyword) :: {:ok, HTTPoison.Response.t} | {:error, HTTPoison.Error.t}
   defp get(endpoint, timeout, credentials, params \\ []) do
     query = URI.encode_query(params)
     url = "https://api.xero.com/api.xro/2.0/#{endpoint}?#{query}"
@@ -330,6 +334,6 @@ defmodule Accounting.XeroAdapter do
       recv_timeout: timeout
   end
 
-  @spec credentials() :: OAuther.Credentials.t
+  @spec credentials() :: %OAuther.Credentials{}
   defp credentials, do: Agent.get(__MODULE__, & &1.credentials)
 end

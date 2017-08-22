@@ -41,7 +41,7 @@ defmodule Accounting.Assertions do
   def refute_transaction(from, date) do
     receive do
       {:transaction, ^from, ^date, _} ->
-        flunk "Unexepcted transaction occurred."
+        flunk "Unexpected transaction occurred."
     after
       @timeout -> true
     end
