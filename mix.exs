@@ -7,9 +7,9 @@ defmodule Accounting.Mixfile do
       build_embedded: Mix.env === :prod,
       deps: deps(),
       description: "Accounting.",
-      elixir: "~> 1.4",
+      elixir: "~> 1.5",
       package: package(),
-      version: "0.6.0",
+      version: "0.7.0",
       start_permanent: Mix.env === :prod,
     ]
   end

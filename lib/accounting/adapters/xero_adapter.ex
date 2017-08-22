@@ -1,18 +1,25 @@
 defmodule Accounting.XeroAdapter do
-  alias Accounting.AccountTransaction
-  import Accounting.XeroView, only: [render: 1, render: 2]
+  alias Accounting.{
+    Account,
+    AccountTransaction,
+    Adapter,
+    Helpers,
+    LineItem,
+    XeroView,
+  }
+  import Helpers, only: [sort_transactions: 1]
+  import XeroView, only: [render: 1, render: 2]
 
-  @behaviour Accounting.Adapter
+  @behaviour Adapter
 
   @typep journal :: %{required(binary) => any}
   @typep offset :: non_neg_integer
-  @typep transactions :: %{optional(String.t) => [Accounting.AccountTransaction.t]}
+  @typep transactions :: %{optional(String.t) => [AccountTransaction.t]}
 
   @rate_limit_delay 1_000
   @xero_name_char_limit 150
 
-  ## Callbacks
-
+  @impl Adapter
   def start_link(opts) do
     consumer_key = Keyword.fetch!(opts, :consumer_key)
     credentials = %OAuther.Credentials{
@@ -81,6 +88,7 @@ defmodule Accounting.XeroAdapter do
     {:error, reasons}
   end
 
+  @impl Adapter
   def register_categories(categories, timeout) when is_list(categories) do
     id = Agent.get(__MODULE__, & &1.tracking_category_id, timeout)
 
@@ -105,14 +113,15 @@ defmodule Accounting.XeroAdapter do
   end
   defp did_register_categories({_, reasons}), do: {:error, reasons}
 
-  def create_account(number, description, timeout) when is_binary(number) do
+  @impl Adapter
+  def register_account(number, description, timeout) when is_binary(number) do
     length = @xero_name_char_limit - String.length(number) + 3
     name = "#{truncate(description, length)} - #{number}"
 
-    "create_account.xml"
+    "register_account.xml"
     |> render(number: number, name: name)
     |> put("Accounts", timeout, credentials())
-    |> did_create_account()
+    |> did_register_account()
   end
 
   @spec truncate(String.t, integer) :: String.t
@@ -121,9 +130,9 @@ defmodule Accounting.XeroAdapter do
   end
   defp truncate(string, _length), do: string
 
-  @spec did_create_account({:ok | :error, term}) :: :ok | {:error, term}
-  defp did_create_account({:ok, %{status_code: 200}}), do: :ok
-  defp did_create_account({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
+  @spec did_register_account({:ok | :error, term}) :: :ok | {:error, term}
+  defp did_register_account({:ok, %{status_code: 200}}), do: :ok
+  defp did_register_account({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
     duplication_error = %{"Message" => "Please enter a unique Code."}
 
     if duplication_error in validation_errors(json) do
@@ -132,7 +141,7 @@ defmodule Accounting.XeroAdapter do
       {:error, reasons}
     end
   end
-  defp did_create_account({_, reasons}), do: {:error, reasons}
+  defp did_register_account({_, reasons}), do: {:error, reasons}
 
   @spec validation_errors(String.t | map) :: [String.t]
   defp validation_errors(json) when is_binary(json) do
@@ -143,20 +152,21 @@ defmodule Accounting.XeroAdapter do
   defp validation_errors(%{"Elements" => [%{"ValidationErrors" => e}|_]}), do: e
   defp validation_errors(%{}), do: []
 
-  def transact(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, timeout) do
+  @impl Adapter
+  def record_entry(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, timeout) do
     line_items
     |> Enum.reduce(0, & &1.amount + &2)
-    |> transact(party, date, line_items, timeout)
+    |> record_entry(party, date, line_items, timeout)
   end
 
-  @spec transact(integer, String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
-  defp transact(0, party, date, line_items, timeout) do
-    "transfer.xml"
+  @spec record_entry(integer, String.t, Date.t, [LineItem.t], timeout) :: :ok | {:error, term}
+  defp record_entry(0, party, date, line_items, timeout) do
+    "record_transfer.xml"
     |> render(date: date, line_items: line_items, party: party)
     |> put("Invoices", timeout, credentials())
-    |> did_transact()
+    |> did_record_entry()
   end
-  defp transact(total, party, date, line_items, timeout) when total < 0 do
+  defp record_entry(total, party, date, line_items, timeout) when total < 0 do
     assigns = [
       bank_account_id: bank_account_id(),
       date: date,
@@ -164,12 +174,12 @@ defmodule Accounting.XeroAdapter do
       party: party,
     ]
 
-    "debit.xml"
+    "record_debit.xml"
     |> render(assigns)
     |> put("BankTransactions", timeout, credentials())
-    |> did_transact()
+    |> did_record_entry()
   end
-  defp transact(_, party, date, line_items, timeout) do
+  defp record_entry(_, party, date, line_items, timeout) do
     assigns = [
       bank_account_id: bank_account_id(),
       date: date,
@@ -177,15 +187,15 @@ defmodule Accounting.XeroAdapter do
       party: party,
     ]
 
-    "credit.xml"
+    "record_credit.xml"
     |> render(assigns)
     |> put("BankTransactions", timeout, credentials())
-    |> did_transact()
+    |> did_record_entry()
   end
 
-  @spec did_transact({:ok | :error, term}) :: :ok | {:error, term}
-  defp did_transact({:ok, %{status_code: 200}}), do: :ok
-  defp did_transact({_, reasons}), do: {:error, reasons}
+  @spec did_record_entry({:ok | :error, term}) :: :ok | {:error, term}
+  defp did_record_entry({:ok, %{status_code: 200}}), do: :ok
+  defp did_record_entry({_, reasons}), do: {:error, reasons}
 
   @spec bank_account_id() :: String.t
   defp bank_account_id, do: Agent.get(__MODULE__, & &1.bank_account_id)
@@ -202,14 +212,15 @@ defmodule Accounting.XeroAdapter do
       recv_timeout: timeout
   end
 
-  def fetch_account_transactions(number, timeout) when is_binary(number) do
+  @impl Adapter
+  def fetch_accounts(numbers, timeout) when is_list(numbers) do
     memo = Agent.get(__MODULE__, & &1.memo, timeout)
     Agent.get_and_update memo, fn
       %{next_offset: offset, transactions: txns, updated: updated} = state ->
         if updated !== now() do
           case fetch_new(offset, txns, timeout) do
             {:ok, new_txns, new_offset} ->
-              value = {:ok, Enum.reverse(new_txns[number] || [])}
+              value = {:ok, get_accounts(new_txns, numbers)}
               new_state = %{
                 transactions: new_txns,
                 next_offset: new_offset,
@@ -220,10 +231,24 @@ defmodule Accounting.XeroAdapter do
               {error, state}
           end
         else
-          value = {:ok, Enum.reverse(txns[number] || [])}
+          value = {:ok, get_accounts(txns, numbers)}
           {value, state}
         end
     end, timeout
+  end
+
+  @spec get_accounts(transactions, [Account.no]) :: %{optional(Account.no) => Account.t}
+  defp get_accounts(transactions, numbers) do
+    for number <- numbers, into: %{} do
+      account =
+        if acct_txns = transactions[number] do
+          %Account{number: number, transactions: sort_transactions(acct_txns)}
+        else
+          []
+        end
+
+      {number, account}
+    end
   end
 
   @spec fetch_new(offset, map, timeout) :: {:ok, map, offset} | {:error, term}

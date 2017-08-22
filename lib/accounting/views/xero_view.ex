@@ -27,7 +27,7 @@ defmodule Accounting.XeroView do
     </Option>
     """
   end
-  def render("credit.xml", assigns) do
+  def render("record_credit.xml", assigns) do
     """
     <BankTransactions>
       <BankTransaction>
@@ -46,7 +46,7 @@ defmodule Accounting.XeroView do
     </BankTransactions>
     """
   end
-  def render("debit.xml", assigns) do
+  def render("record_debit.xml", assigns) do
     """
     <BankTransactions>
       <BankTransaction>
@@ -65,7 +65,7 @@ defmodule Accounting.XeroView do
     </BankTransactions>
     """
   end
-  def render("transfer.xml", assigns) do
+  def render("record_transfer.xml", assigns) do
     """
     <Invoices>
       <Invoice>
@@ -108,7 +108,7 @@ defmodule Accounting.XeroView do
     </LineItem>
     """
   end
-  def render("create_account.xml", assigns) do
+  def render("register_account.xml", assigns) do
     """
     <Account>
       <Code>#{xml_escape assigns[:number]}</Code>

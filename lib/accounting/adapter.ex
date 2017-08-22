@@ -1,7 +1,9 @@
 defmodule Accounting.Adapter do
-  @callback create_account(String.t, String.t, timeout) :: :ok | {:error, term}
-  @callback fetch_account_transactions(String.t, timeout) :: {:ok, [Accounting.AccountTransaction.t]} | {:error, term}
+  alias Accounting.{Account, LineItem}
+
+  @callback fetch_accounts([Account.no], timeout) :: {:ok, %{optional(Account.no) => Account.t}} | {:error, term}
+  @callback record_entry(String.t, Date.t, [LineItem.t], timeout) :: :ok | {:error, term}
+  @callback register_account(Account.no, String.t, timeout) :: :ok | {:error, term}
   @callback register_categories([atom], timeout) :: :ok | {:error, term}
   @callback start_link(opts :: any) :: Supervisor.on_start
-  @callback transact(String.t, Date.t, [Accounting.LineItem.t], timeout) :: :ok | {:error, term}
 end

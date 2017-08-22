@@ -1,38 +1,33 @@
 defmodule Accounting.TestAdapter do
-  @behaviour Accounting.Adapter
+  alias Accounting.{Account, AccountTransaction, Adapter, Helpers}
+  import Helpers, only: [sort_transactions: 1]
 
-  alias Accounting.AccountTransaction
+  @behaviour Adapter
 
-  def reset, do: Agent.update(__MODULE__, fn _ -> %{} end)
+  @typep transactions :: %{optional(String.t) => [AccountTransaction.t]}
 
-  ## Callbacks
+  @impl Adapter
+  def fetch_accounts(numbers, _timeout) do
+    {:ok, Agent.get(__MODULE__, &get_accounts(&1, numbers))}
+  end
 
-  def start_link(_opts), do: Agent.start_link(&Map.new/0, name: __MODULE__)
+  @spec get_accounts(transactions, [Account.no]) :: %{optional(Account.no) => Account.t}
+  defp get_accounts(transactions, numbers) do
+    for number <- numbers, into: %{} do
+      account =
+        if acct_txns = transactions[number] do
+          %Account{number: number, transactions: sort_transactions(acct_txns)}
+        else
+          %Account{number: number}
+        end
 
-  def register_categories(categories, _timeout) do
-    Enum.each categories, fn category ->
-      send self(), {:registered_category, category}
+      {number, account}
     end
   end
 
-  def create_account(number, _description, _timeout) do
-    send self(), {:created_account, number}
-
-    if exists?(number) do
-      {:error, :duplicate}
-    else
-      Agent.update(__MODULE__, &Map.put(&1, number, []))
-    end
-  end
-
-  defp exists?(account_number) do
-    Agent.get(__MODULE__, &Map.has_key?(&1, account_number))
-  end
-
-  def transact(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, _timeout) do
-    Enum.each line_items, fn item ->
-      send self(), {:transaction, party, date, item}
-    end
+  @impl Adapter
+  def record_entry(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, _timeout) do
+    for item <- line_items, do: send self(), {:transaction, party, date, item}
 
     if all_exist?(for i <- line_items, do: i.account_number) do
       Agent.update __MODULE__, fn state ->
@@ -51,21 +46,38 @@ defmodule Accounting.TestAdapter do
     end
   end
 
+  @spec all_exist?([String.t]) :: boolean
   defp all_exist?(account_numbers) do
     Agent.get __MODULE__, fn state ->
       Enum.all?(account_numbers, &Map.has_key?(state, &1))
     end
   end
 
-  def fetch_account_transactions(number, _timeout) do
-    {:ok, get_account_transactions(number)}
-  end
+  @impl Adapter
+  def register_account(number, _description, _timeout) do
+    send self(), {:created_account, number}
 
-  defp get_account_transactions(number) do
-    if account_data = Agent.get(__MODULE__, &Map.get(&1, number)) do
-      Enum.reverse(account_data)
+    if exists?(number) do
+      {:error, :duplicate}
     else
-      []
+      Agent.update(__MODULE__, &Map.put(&1, number, []))
     end
   end
+
+  @spec exists?(String.t) :: boolean
+  defp exists?(account_number) do
+    Agent.get(__MODULE__, &Map.has_key?(&1, account_number))
+  end
+
+  @impl Adapter
+  def register_categories(categories, _timeout) do
+    for c <- categories, do: send self(), {:registered_category, c}
+    :ok
+  end
+
+  @spec reset() :: :ok
+  def reset, do: Agent.update(__MODULE__, fn _ -> %{} end)
+
+  @impl Adapter
+  def start_link(_opts), do: Agent.start_link(&Map.new/0, name: __MODULE__)
 end
