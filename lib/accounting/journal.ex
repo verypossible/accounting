@@ -7,6 +7,9 @@ defmodule Accounting.Journal do
 
   @default_timeout 5_000
 
+  @spec child_spec(keyword) :: Supervisor.Spec.spec
+  def child_spec(opts), do: Supervisor.Spec.worker(__MODULE__, [opts])
+
   @spec fetch_accounts([Account.no], timeout) :: {:ok, %{optional(Account.no) => Account.t}} | {:error, term}
   def fetch_accounts(numbers, timeout \\ @default_timeout) do
     adapter().fetch_accounts(numbers, timeout)
@@ -30,4 +33,16 @@ defmodule Accounting.Journal do
 
   @spec adapter() :: module
   defp adapter, do: Agent.get(__MODULE__, & &1)
+
+  @spec start_link(keyword) :: Supervisor.on_start
+  def start_link(opts) do
+    adapter = Keyword.fetch!(opts, :adapter)
+    children = [
+      Supervisor.Spec.worker(Agent, [fn -> adapter end, [name: __MODULE__]]),
+      {adapter, opts},
+    ]
+    Supervisor.start_link children,
+      name: Accounting.Supervisor,
+      strategy: :one_for_all
+  end
 end

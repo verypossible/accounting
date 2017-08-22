@@ -19,13 +19,16 @@ journal once while obtaining multiple amounts from the returned accounts.
   * [Account] Add `balance/1`
   * [Account] Add `balance_on_date/2`
   * [Account] Add `transactions/1`
+  * [Adapter] Add `child_spec/1` callback
   * [Adapter] Add `fetch_accounts/2` callback
   * [Adapter] Add `record_entry/4` callback
   * [Adapter] Add `register_account/3` callback
+  * [Journal] Add `child_spec/1`
   * [Journal] Add `fetch_accounts/1–2`
   * [Journal] Add `record_entry/3–4`
-  * [Journal] Add `register_account/2–3
+  * [Journal] Add `register_account/2–3`
   * [Journal] Add `register_categories/1–2`
+  * [Journal] Add `start_link/1`
 
 ### 2. Deprecations
 
