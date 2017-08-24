@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.1 (2017-08-24)
+
+### 1. Enhancements
+
+  * Add new types
+
+### 2. Bug fixes
+
+  * [XeroAdapter] Return accounts from `fetch_accounts/2` for accounts that have
+    not been registered
+
 ## v0.7.0 (2017-08-21)
 
 This release radically alters the API. It serves to separate value functions

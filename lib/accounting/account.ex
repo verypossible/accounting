@@ -5,14 +5,14 @@ defmodule Accounting.Account do
 
   alias Accounting.AccountTransaction
 
-  @type no :: String.t
+  @opaque t :: %__MODULE__{number: account_number, transactions: [AccountTransaction.t]}
 
-  @opaque t :: %__MODULE__{number: no, transactions: [AccountTransaction.t]}
+  @typep account_number :: Accounting.account_number
 
   defstruct [:number, {:transactions, []}]
 
   @spec average_daily_balance(t, Date.Range.t) :: integer
-  def average_daily_balance(account, date_range) do
+  def average_daily_balance(%__MODULE__{} = account, %Date.Range{} = date_range) do
     account
     |> Map.fetch!(:transactions)
     |> daily_balances(date_range)
@@ -51,12 +51,12 @@ defmodule Accounting.Account do
   defp mean(list), do: Enum.reduce(list, 0, &Kernel.+/2) / length(list)
 
   @spec balance(t) :: integer
-  def balance(account) do
+  def balance(%__MODULE__{} = account) do
     Enum.reduce(account.transactions, 0, & &1.amount + &2)
   end
 
   @spec balance_on_date(t, Date.t) :: integer
-  def balance_on_date(account, date) do
+  def balance_on_date(%__MODULE__{} = account, %Date{} = date) do
     {_, balance} =
       Enumerable.reduce account.transactions, {:cont, 0}, fn transaction, acc ->
         if Date.compare(transaction.date, date) === :gt do
@@ -70,7 +70,7 @@ defmodule Accounting.Account do
   end
 
   @spec transactions(t) :: [AccountTransaction.t]
-  def transactions(account), do: account.transactions
+  def transactions(%__MODULE__{} = account), do: account.transactions
 
   defimpl Inspect do
     import Inspect.Algebra, only: [concat: 1]

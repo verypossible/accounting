@@ -18,7 +18,7 @@ defmodule Accounting.Mixfile do
       ],
       elixir: "~> 1.5",
       package: package(),
-      version: "0.7.0",
+      version: "0.7.1",
       start_permanent: Mix.env === :prod,
     ]
   end
