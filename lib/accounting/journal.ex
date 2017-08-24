@@ -5,12 +5,16 @@ defmodule Accounting.Journal do
 
   alias Accounting.{Account, LineItem}
 
+  @type accounts :: %{optional(account_number) => Account.t}
+
+  @typep account_number :: Accounting.account_number
+
   @default_timeout 5_000
 
   @spec child_spec(keyword) :: Supervisor.Spec.spec
   def child_spec(opts), do: Supervisor.Spec.worker(__MODULE__, [opts])
 
-  @spec fetch_accounts([Account.no], timeout) :: {:ok, %{optional(Account.no) => Account.t}} | {:error, term}
+  @spec fetch_accounts([account_number], timeout) :: {:ok, accounts} | {:error, term}
   def fetch_accounts(numbers, timeout \\ @default_timeout) do
     adapter().fetch_accounts(numbers, timeout)
   end
@@ -21,7 +25,7 @@ defmodule Accounting.Journal do
     adapter().record_entry(party, date, filtered_line_items, timeout)
   end
 
-  @spec register_account(Account.no, String.t, timeout) :: :ok | {:error, term}
+  @spec register_account(account_number, String.t, timeout) :: :ok | {:error, term}
   def register_account(number, description, timeout \\ @default_timeout) do
     adapter().register_account(number, description, timeout)
   end

@@ -4,6 +4,7 @@ defmodule Accounting.XeroAdapter do
     AccountTransaction,
     Adapter,
     Helpers,
+    Journal,
     LineItem,
     XeroView,
   }
@@ -12,10 +13,11 @@ defmodule Accounting.XeroAdapter do
 
   @behaviour Adapter
 
+  @typep account_number :: Accounting.account_number
   @typep credentials :: %OAuther.Credentials{method: :rsa_sha1, token_secret: nil}
   @typep journal :: %{required(binary) => any}
   @typep offset :: non_neg_integer
-  @typep transactions :: %{optional(String.t) => [AccountTransaction.t]}
+  @typep transactions :: %{optional(account_number) => [AccountTransaction.t]}
 
   @rate_limit_delay 1_000
   @xero_name_char_limit 150
@@ -241,16 +243,13 @@ defmodule Accounting.XeroAdapter do
     end, timeout
   end
 
-  @spec get_accounts(transactions, [Account.no]) :: %{optional(Account.no) => Account.t}
+  @spec get_accounts(transactions, [account_number]) :: Journal.accounts
   defp get_accounts(transactions, numbers) do
     for number <- numbers, into: %{} do
-      account =
-        if acct_txns = transactions[number] do
-          %Account{number: number, transactions: sort_transactions(acct_txns)}
-        else
-          []
-        end
-
+      account = %Account{
+        number: number,
+        transactions: sort_transactions(transactions[number] || []),
+      }
       {number, account}
     end
   end

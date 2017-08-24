@@ -1,10 +1,11 @@
 defmodule Accounting.TestAdapter do
-  alias Accounting.{Account, AccountTransaction, Adapter, Helpers}
+  alias Accounting.{Account, AccountTransaction, Adapter, Helpers, Journal}
   import Helpers, only: [sort_transactions: 1]
 
   @behaviour Adapter
 
-  @typep transactions :: %{optional(String.t) => [AccountTransaction.t]}
+  @typep account_number :: Accounting.account_number
+  @typep transactions :: %{optional(account_number) => [AccountTransaction.t]}
 
   @impl Adapter
   def child_spec(opts), do: Supervisor.Spec.worker(__MODULE__, [opts])
@@ -14,7 +15,7 @@ defmodule Accounting.TestAdapter do
     {:ok, Agent.get(__MODULE__, &get_accounts(&1, numbers))}
   end
 
-  @spec get_accounts(transactions, [Account.no]) :: %{optional(Account.no) => Account.t}
+  @spec get_accounts(transactions, [account_number]) :: Journal.accounts
   defp get_accounts(transactions, numbers) do
     for number <- numbers, into: %{} do
       account =
@@ -49,7 +50,7 @@ defmodule Accounting.TestAdapter do
     end
   end
 
-  @spec all_exist?([String.t]) :: boolean
+  @spec all_exist?([account_number]) :: boolean
   defp all_exist?(account_numbers) do
     Agent.get __MODULE__, fn state ->
       Enum.all?(account_numbers, &Map.has_key?(state, &1))
@@ -67,7 +68,7 @@ defmodule Accounting.TestAdapter do
     end
   end
 
-  @spec exists?(String.t) :: boolean
+  @spec exists?(account_number) :: boolean
   defp exists?(account_number) do
     Agent.get(__MODULE__, &Map.has_key?(&1, account_number))
   end

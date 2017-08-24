@@ -2,7 +2,7 @@ defmodule Accounting.TestAdapterTest do
   use ExUnit.Case, async: true
   doctest Accounting.TestAdapter
 
-  alias Accounting.{Account, AccountTransaction, LineItem, TestAdapter}
+  alias Accounting.{Account, LineItem, TestAdapter}
 
   setup do
     {:ok, _} = TestAdapter.start_link([])
