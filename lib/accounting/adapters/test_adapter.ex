@@ -5,21 +5,24 @@ defmodule Accounting.TestAdapter do
   @behaviour Adapter
 
   @typep account_number :: Accounting.account_number
+  @typep state :: %{optional(Journal.id) => transactions}
   @typep transactions :: %{optional(account_number) => [AccountTransaction.t]}
 
   @impl Adapter
-  def child_spec(opts), do: Supervisor.Spec.worker(__MODULE__, [opts])
-
-  @impl Adapter
-  def fetch_accounts(numbers, _timeout) do
-    {:ok, Agent.get(__MODULE__, &get_accounts(&1, numbers))}
+  def child_spec(opts) do
+    %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
   end
 
-  @spec get_accounts(transactions, [account_number]) :: Journal.accounts
-  defp get_accounts(transactions, numbers) do
+  @impl Adapter
+  def fetch_accounts(journal_id, numbers, _timeout) do
+    {:ok, Agent.get(__MODULE__, &get_accounts(&1, journal_id, numbers))}
+  end
+
+  @spec get_accounts(state, Journal.id, [account_number]) :: Journal.accounts
+  defp get_accounts(state, journal_id, numbers) do
     for number <- numbers, into: %{} do
       account =
-        if acct_txns = transactions[number] do
+        if acct_txns = state[journal_id][number] do
           %Account{number: number, transactions: sort_transactions(acct_txns)}
         else
           %Account{number: number}
@@ -30,52 +33,64 @@ defmodule Accounting.TestAdapter do
   end
 
   @impl Adapter
-  def record_entry(<<_::binary>> = party, %Date{} = date, [_|_] = line_items, _timeout) do
-    for item <- line_items, do: send self(), {:transaction, party, date, item}
+  def record_entry(journal_id, <<_::binary>> = party, %Date{} = date, [_|_] = line_items, _timeout) do
+    for item <- line_items do
+      send self(), {:transaction, journal_id, party, date, item}
+    end
 
-    if all_exist?(for i <- line_items, do: i.account_number) do
+    if all_exist?(journal_id, (for i <- line_items, do: i.account_number)) do
       Agent.update __MODULE__, fn state ->
-        Enum.reduce line_items, state, fn item, acc ->
-          number = item.account_number
-          transaction = %AccountTransaction{
-            amount: item.amount,
-            description: item.description,
-            date: date,
-          }
-          Map.update!(acc, number, &List.insert_at(&1, 0, transaction))
-        end
+        transactions = state[journal_id] || %{}
+        new_transactions =
+          Enum.reduce line_items, transactions, fn item, acc ->
+            transaction = %AccountTransaction{
+              amount: item.amount,
+              description: item.description,
+              date: date,
+            }
+            Map.update!(acc, item.account_number, &[transaction|&1])
+          end
+
+        Map.put(state, journal_id, new_transactions)
       end
     else
       {:error, :no_such_account}
     end
   end
 
-  @spec all_exist?([account_number]) :: boolean
-  defp all_exist?(account_numbers) do
+  @spec all_exist?(Journal.id, [account_number]) :: boolean
+  defp all_exist?(journal_id, account_numbers) do
     Agent.get __MODULE__, fn state ->
-      Enum.all?(account_numbers, &Map.has_key?(state, &1))
+      Enum.all?(account_numbers, &Map.has_key?(state[journal_id] || %{}, &1))
     end
   end
 
   @impl Adapter
-  def register_account(number, _description, _timeout) do
-    send self(), {:created_account, number}
+  def register_account(journal_id, number, _description, _timeout) do
+    send self(), {:created_account, journal_id, number}
 
-    if exists?(number) do
+    if exists?(journal_id, number) do
       {:error, :duplicate}
     else
-      Agent.update(__MODULE__, &Map.put(&1, number, []))
+      Agent.update(__MODULE__, &put_account(&1, journal_id, number))
     end
   end
 
-  @spec exists?(account_number) :: boolean
-  defp exists?(account_number) do
-    Agent.get(__MODULE__, &Map.has_key?(&1, account_number))
+  @spec put_account(state, Journal.id, account_number) :: state
+  defp put_account(state, journal_id, number) do
+    Map.update state, journal_id, %{number => []}, fn transactions ->
+      Map.put(transactions, number, [])
+    end
+  end
+
+  @spec exists?(Journal.id, account_number) :: boolean
+  defp exists?(journal_id, account_number) do
+    Agent.get(__MODULE__, &Map.has_key?(&1[journal_id] || %{}, account_number))
   end
 
   @impl Adapter
-  def register_categories(categories, _timeout) do
-    for c <- categories, do: send self(), {:registered_category, c}
+  def register_categories(journal_id, categories, _timeout) do
+    for c <- categories, do: send self(), {:registered_category, journal_id, c}
     :ok
   end
 

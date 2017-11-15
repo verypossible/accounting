@@ -18,16 +18,17 @@ defmodule Accounting.Mixfile do
       ],
       elixir: "~> 1.5",
       package: package(),
-      version: "0.7.1",
+      version: "0.8.0",
       start_permanent: Mix.env === :prod,
     ]
   end
 
   defp deps do
     [
-      {:dialyxir, "~> 0.5", only: :dev, runtime: false},
+      {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:httpoison, "~> 0.11"},
+      {:mix_test_watch, "~> 0.5", only: :dev, runtime: false},
       {:oauther, "~> 1.1.0"},
       {:poison, "~> 2.2 or ~> 3.0"},
     ]

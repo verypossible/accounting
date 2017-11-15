@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.8.0 (2017-11-14)
+
+This release facilitates handling multiple journals. Most `Journal` function calls now require a journal id.
+
+### 1. Enhancements
+
+  * [Adapter] Add `fetch_accounts/3` callback
+  * [Adapter] Add `record_entry/4-5` callback
+  * [Adapter] Add `register_account/3-4` callback
+  * [Adapter] Add `register_categories/2-3` callback
+  * [Assertions] Add `assert_registered_category/2`
+  * [Assertions] Add `assert_created_account/2`
+  * [Assertions] Add `assert_transaction_with_line_item/4`
+  * [Assertions] Add `refute_transaction/3`
+  * [Journal] Add id type
+  * [Journal] Add `fetch_accounts/2-3`
+  * [Journal] Add `record_entry/4-5`
+  * [Journal] Add `register_account/3-4`
+  * [Journal] Add `register_categories/2-3`
+  * [Journal] Allow `start_link/1` opts to provide `journal_opts` key which is passed to the adapter
+  * [XeroAdapter] Expect `start_link/1` to receive a map of journal options with `Journal.id/0` keys and keyword list values with required `:bank_account_id`, `:consumer_key`, and `:consumer_secret` keys
+
+### 2. Removals
+
+  * [Adapter] `fetch_accounts/2` callback, in favor of `fetch_accounts/3`
+  * [Adapter] `record_entry/3-4` callback, in favor of `record_entry/4-5`
+  * [Adapter] `register_account/2-3` callback, in favor of `register_account/3-4`
+  * [Adapter] `register_categories/1-2` callback, in favor of `register_categories/2-3`
+  * [Assertions] `assert_registered_category/1`, in favor of `assert_registered_category/2`
+  * [Assertions] `assert_created_account/1`, in favor of `assert_created_account/2`
+  * [Assertions] `assert_transaction_with_line_item/3`, in favor of `assert_transaction_with_line_item/4`
+  * [Assertions] `refute_transaction/2`, in favor of `refute_transaction/3`
+  * [Journal] `fetch_accounts/1-2`, in favor of `fetch_accounts/2-3`
+  * [Journal] `record_entry/3-4`, in favor of `record_entry/4-5`
+  * [Journal] `register_account/2-3`, in favor of `register_account/3-4`
+  * [Journal] `register_categories/1-2`, in favor of `register_categories/2-3`
+  * [XeroAdapter] `start_link/1` keyword list argument, in favor of a map with `Journal.id/0` keys and keyword list values with required `:bank_account_id`, `:consumer_key`, and `:consumer_secret` keys
+
 ## v0.7.1 (2017-08-24)
 
 ### 1. Enhancements
@@ -41,7 +79,7 @@ journal once while obtaining multiple amounts from the returned accounts.
   * [Journal] Add `register_categories/1–2`
   * [Journal] Add `start_link/1`
 
-### 2. Deprecations
+### 2. Removals
 
   * `create_account/2–3`, in favor of `Journal.register_account/2–3`
   * `fetch_account_transactions/2–3`
@@ -66,7 +104,7 @@ journal once while obtaining multiple amounts from the returned accounts.
   * [Assertions] Add `assert_transaction_with_line_item/3`
   * [Assertions] Add `refute_transaction_with_line_item/3`
 
-### 2. Deprecations
+### 2. Removals
 
   * `receive_money/4`, in favor of `transact/4`
   * `spend_money/4`
