@@ -3,7 +3,7 @@ defmodule Accounting.Journal do
   Functions that write to and read from the journal.
   """
 
-  alias Accounting.{Account, Journal, LineItem}
+  alias Accounting.{Account, Entry, Journal}
 
   @type accounts :: %{optional(account_number) => Account.t}
   @type id :: atom
@@ -22,10 +22,9 @@ defmodule Accounting.Journal do
     adapter().fetch_accounts(journal_id, numbers, timeout)
   end
 
-  @spec record_entry(Journal.id, String.t, Date.t, [LineItem.t], timeout) :: :ok | {:error, term}
-  def record_entry(journal_id, party, date, line_items, timeout \\ @default_timeout) do
-    filtered = for i <- line_items, i.amount !== 0, do: i
-    adapter().record_entry(journal_id, party, date, filtered, timeout)
+  @spec record_entries(Journal.id, [Entry.t, ...], timeout) :: :ok | {:error, term}
+  def record_entries(journal_id, [_|_] = entries, timeout \\ @default_timeout) do
+    adapter().record_entries(journal_id, entries, timeout)
   end
 
   @spec register_account(Journal.id, account_number, String.t, timeout) :: :ok | {:error, term}
@@ -44,14 +43,13 @@ defmodule Accounting.Journal do
   @spec start_link(keyword) :: Supervisor.on_start
   def start_link(opts) do
     adapter = Keyword.fetch!(opts, :adapter)
-    journal_opts = Keyword.get(opts, :journal_opts, %{})
     agent_spec = %{
       id: Agent,
       start: {Agent, :start_link, [fn -> adapter end, [name: __MODULE__]]},
     }
     children = [
       agent_spec,
-      {adapter, journal_opts},
+      {adapter, opts},
     ]
     Supervisor.start_link children,
       name: Accounting.Supervisor,

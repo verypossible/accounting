@@ -1,4 +1,9 @@
 defmodule Accounting.Assertions do
+  @moduledoc """
+  This module contains a set of assertion functions.
+  """
+
+  alias Accounting.Journal
   import ExUnit.Assertions, only: [flunk: 1]
 
   @timeout 100

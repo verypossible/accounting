@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.0 (2017-12-11)
+
+### 1. Enhancements
+
+  * Add Entry type
+  * Add HTTPClient behaviour
+  * [Adapter] Add `record_entries/3` callback
+  * [Entry] Add Error type
+  * [Journal] Add `record_entries/2-3`
+  * [XeroAdapter] Add DefaultHTTPClient module
+
+### 2. Removals
+
+  * [Adapter] `record_entry/5` callback, in favor of `record_entries/3`
+  * [Journal] `record_entry/4-5`, in favor of `record_entries/2-3`
+
 ## v0.8.0 (2017-11-14)
 
 This release facilitates handling multiple journals. Most `Journal` function calls now require a journal id.
@@ -53,7 +69,7 @@ This release facilitates handling multiple journals. Most `Journal` function cal
 
 This release radically alters the API. It serves to separate value functions
 from effect functions. The new `Journal` module provides functions for reading
-to and writing from the journal. On success, `Journal.fetch_accounts/1–2`
+to and writing from the journal. On success, `Journal.fetch_accounts/1-2`
 returns accounts. The new `Account` module provides functions for obtaining
 amounts and transactions from these accounts.
 
@@ -73,21 +89,21 @@ journal once while obtaining multiple amounts from the returned accounts.
   * [Adapter] Add `record_entry/4` callback
   * [Adapter] Add `register_account/3` callback
   * [Journal] Add `child_spec/1`
-  * [Journal] Add `fetch_accounts/1–2`
-  * [Journal] Add `record_entry/3–4`
-  * [Journal] Add `register_account/2–3`
-  * [Journal] Add `register_categories/1–2`
+  * [Journal] Add `fetch_accounts/1-2`
+  * [Journal] Add `record_entry/3-4`
+  * [Journal] Add `register_account/2-3`
+  * [Journal] Add `register_categories/1-2`
   * [Journal] Add `start_link/1`
 
 ### 2. Removals
 
-  * `create_account/2–3`, in favor of `Journal.register_account/2–3`
-  * `fetch_account_transactions/2–3`
-  * `fetch_ADB/3–4`
-  * `fetch_balance/1–2`
-  * `fetch_balance_on_date/2–3`
-  * `register_categories/1–2`, in favor of `Journal.register_categories/1–2`
-  * `transact/3–4`, in favor of `Journal.record_entry/3–4`
+  * `create_account/2-3`, in favor of `Journal.register_account/2-3`
+  * `fetch_account_transactions/2-3`
+  * `fetch_ADB/3-4`
+  * `fetch_balance/1-2`
+  * `fetch_balance_on_date/2-3`
+  * `register_categories/1-2`, in favor of `Journal.register_categories/1-2`
+  * `transact/3-4`, in favor of `Journal.record_entry/3-4`
   * [Adapter] `fetch_account_transactions/2` callback, in favor of
     `fetch_accounts/2`
   * [Adapter] `transact/4` callback, in favor of `record_entry/4`

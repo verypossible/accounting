@@ -2,7 +2,7 @@ defmodule Accounting.TestAdapterTest do
   use ExUnit.Case, async: true
   doctest Accounting.TestAdapter
 
-  alias Accounting.{Account, LineItem, TestAdapter}
+  alias Accounting.{Account, Entry, LineItem, TestAdapter}
 
   setup do
     {:ok, _} = TestAdapter.start_link([])
@@ -10,7 +10,7 @@ defmodule Accounting.TestAdapterTest do
   end
 
   describe "fetch_accounts/2" do
-    setup do: {:ok, number: "F100"}
+    setup do: %{number: "F100"}
 
     test "without any registered accounts or entries", %{number: number} do
       journal_id = :orange_journal
@@ -30,13 +30,8 @@ defmodule Accounting.TestAdapterTest do
         amount: 9_000_000_00,
         description: "Wafers",
       }
-      :ok = TestAdapter.record_entry(
-        journal_id,
-        party,
-        ~D[1972-06-19],
-        [item],
-        :infinity
-      )
+      entry = Entry.new(party, ~D[1972-06-19], [item])
+      :ok = TestAdapter.record_entries(journal_id, [entry], :infinity)
       assert {:ok, accounts} =
         TestAdapter.fetch_accounts(journal_id, [number], :infinity)
 
@@ -66,20 +61,10 @@ defmodule Accounting.TestAdapterTest do
           "Campaign to assuage concerns over mechanically-separated buffalo " <>
           "meat",
       }
-      :ok = TestAdapter.record_entry(
-        journal_id,
-        party,
-        ~D[2000-01-01],
-        [item2],
-        :infinity
-      )
-      :ok = TestAdapter.record_entry(
-        journal_id,
-        party,
-        ~D[1999-12-31],
-        [item1],
-        :infinity
-      )
+      entry1 = Entry.new(party, ~D[1999-12-31], [item1])
+      entry2 = Entry.new(party, ~D[2000-01-01], [item2])
+      :ok = TestAdapter.record_entries(journal_id, [entry2], :infinity)
+      :ok = TestAdapter.record_entries(journal_id, [entry1], :infinity)
       assert {:ok, accounts} =
         TestAdapter.fetch_accounts(journal_id, [number], :infinity)
 
@@ -100,38 +85,101 @@ defmodule Accounting.TestAdapterTest do
     end
   end
 
-  describe "record_entry/4" do
-    test "with an unregistered account" do
+  describe "record_entries/3" do
+    test "with an entry on an unregistered account" do
       journal_id = :blue_journal
       party = "Moonbeams Unlimited"
       date = ~D[1999-12-31]
+      number = "Z100"
       items = [
-        %LineItem{account_number: "Z100", amount: 0_02, description: "Photons"},
-        %LineItem{account_number: "Z100", amount: 0, description: "Free hugs"},
+        %LineItem{account_number: number, amount: 0_02, description: "Photons"},
+        %LineItem{account_number: number, amount: 0, description: "Free hugs"},
       ]
+      entry = Entry.new(party, date, items)
       assert {:error, :no_such_account} ===
-        TestAdapter.record_entry(journal_id, party, date, items, :infinity)
+        TestAdapter.record_entries(journal_id, [entry], :infinity)
 
       for i <- items do
         assert_received {:transaction, ^journal_id, ^party, ^date, ^i}
       end
+
+      assert {:ok, %{^number => account}} =
+        TestAdapter.fetch_accounts(journal_id, [number], :infinity)
+
+      assert [] === Account.transactions(account)
     end
 
-    test "with a registered account" do
+    test "with an entry on a registered account" do
       journal_id = :red_journal
       :ok = TestAdapter.register_account(journal_id, "F200", nil, :infinity)
       party = "Leo"
       date = ~D[1093-11-11]
-      item = %LineItem{account_number: "F200", amount: 2_09, description: "Air"}
+      number = "F200"
+      amount = 2_09
+      desc = "Air"
+      item = %LineItem{
+        account_number: number,
+        amount: amount,
+        description: desc,
+      }
+      entry = Entry.new(party, date, [item])
       assert :ok ===
-        TestAdapter.record_entry(journal_id, party, date, [item], :infinity)
+        TestAdapter.record_entries(journal_id, [entry], :infinity)
 
       assert_received {:transaction, ^journal_id, ^party, ^date, ^item}
+
+      assert {:ok, %{^number => account}} =
+        TestAdapter.fetch_accounts(journal_id, [number], :infinity)
+
+      assert [%{amount: ^amount, date: ^date, description: ^desc}] =
+        Account.transactions(account)
+    end
+
+    test "with multiple entries on registered accounts" do
+      journal_id = :aubergine_journal
+      number1 = "H300"
+      number2 = "X400"
+      :ok = TestAdapter.register_account(journal_id, number1, nil, :infinity)
+      :ok = TestAdapter.register_account(journal_id, number2, nil, :infinity)
+      party1 = "Dillards"
+      party2 = "Design Within Reach"
+      date1 = ~D[2023-08-15]
+      date2 = ~D[1992-02-02]
+      amount1 = 1_849_49
+      amount2 = 0_38
+      desc1 = "Leaves"
+      desc2 = "Designer furniture"
+      item1 = %LineItem{
+        account_number: number1,
+        amount: amount1,
+        description: desc1,
+      }
+      item2 = %LineItem{
+        account_number: number2,
+        amount: amount2,
+        description: desc2,
+      }
+      entry1 = Entry.new(party1, date1, [item1])
+      entry2 = Entry.new(party2, date2, [item2])
+      assert :ok ===
+        TestAdapter.record_entries(journal_id, [entry1, entry2], :infinity)
+
+      assert_received {:transaction, ^journal_id, ^party1, ^date1, ^item1}
+      assert_received {:transaction, ^journal_id, ^party2, ^date2, ^item2}
+
+      assert {:ok, %{^number1 => account1, ^number2 => account2}} =
+        TestAdapter.fetch_accounts(journal_id, [number1, number2], :infinity)
+
+      assert [%{amount: ^amount1, date: ^date1, description: ^desc1}] =
+        Account.transactions(account1)
+
+      assert [%{amount: ^amount2, date: ^date2, description: ^desc2}] =
+        Account.transactions(account2)
     end
   end
 
   describe "register_account/3" do
-    setup do: {:ok, name: "Margus Laroux", number: "F300"}
+    setup do: %{name: "Margus Laroux", number: "F300"}
 
     test "with a duplicate", %{name: name, number: number} do
       journal_id = :yellow_journal
