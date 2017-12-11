@@ -5,7 +5,7 @@ defmodule Accounting.AccountTest do
   alias Accounting.{Account, AccountTransaction}
 
   describe "average_daily_balance/3" do
-    setup do: {:ok, date_range: Date.range(~D[2000-04-01], ~D[2000-04-30])}
+    setup do: %{date_range: Date.range(~D[2000-04-01], ~D[2000-04-30])}
 
     test "without any transactions", %{date_range: date_range} do
       account = %Account{}
@@ -79,7 +79,7 @@ defmodule Accounting.AccountTest do
         date: ~D[1980-02-02],
         description: "debit",
       }
-      {:ok, credit: credit, debit: debit}
+      %{credit: credit, debit: debit}
     end
 
     test "without any transactions" do
@@ -125,7 +125,7 @@ defmodule Accounting.AccountTest do
   describe "balance_on_date/2" do
     setup do
       transaction = %AccountTransaction{amount: 55_55, date: ~D[1970-01-01]}
-      {:ok, transaction: transaction}
+      %{transaction: transaction}
     end
 
     test "without any transactions" do

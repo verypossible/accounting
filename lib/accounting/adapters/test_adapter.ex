@@ -1,5 +1,17 @@
 defmodule Accounting.TestAdapter do
-  alias Accounting.{Account, AccountTransaction, Adapter, Helpers, Journal}
+  @moduledoc """
+  The journal adapter for test.
+  """
+
+  alias Accounting.{
+    Account,
+    AccountTransaction,
+    Adapter,
+    Entry,
+    Helpers,
+    Journal,
+    LineItem,
+  }
   import Helpers, only: [sort_transactions: 1]
 
   @behaviour Adapter
@@ -33,7 +45,23 @@ defmodule Accounting.TestAdapter do
   end
 
   @impl Adapter
-  def record_entry(journal_id, <<_::binary>> = party, %Date{} = date, [_|_] = line_items, _timeout) do
+  def record_entries(journal_id, entries, _timeout) do
+    Enum.reduce_while entries, :ok, fn e, _ ->
+      case record_entry(journal_id, e) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end
+  end
+
+  @spec record_entry(Journal.id, %Entry{date: Date.t, line_items: [LineItem.t, ...] , party: String.t}) :: :ok | {:error, :no_such_account}
+  defp record_entry(journal_id, entry) do
+    %Entry{
+      date: %Date{} = date,
+      line_items: [_|_] = line_items,
+      party: <<_::binary>> = party,
+    } = entry
+
     for item <- line_items do
       send self(), {:transaction, journal_id, party, date, item}
     end

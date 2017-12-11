@@ -1,11 +1,15 @@
 defmodule Accounting.XeroAdapter do
+  @moduledoc """
+  The journal adapter for https://developer.xero.com/.
+  """
+
   alias Accounting.{
     Account,
     AccountTransaction,
     Adapter,
+    Entry,
     Helpers,
     Journal,
-    LineItem,
     XeroView,
   }
   import Helpers, only: [sort_transactions: 1]
@@ -17,7 +21,7 @@ defmodule Accounting.XeroAdapter do
   @typep configs :: %{required(Journal.id) => journal_config}
   @typep credentials :: %OAuther.Credentials{method: :rsa_sha1, token_secret: nil}
   @typep journal :: %{required(binary) => any}
-  @typep journal_config :: %{bank_account_id: String.t, credentials: %OAuther.Credentials{}, tracking_category_id: String.t}
+  @typep journal_config :: %{bank_account_id: String.t, credentials: credentials, tracking_category_id: String.t}
   @typep offset :: non_neg_integer
   @typep transactions :: %{optional(account_number) => [AccountTransaction.t]}
 
@@ -30,40 +34,44 @@ defmodule Accounting.XeroAdapter do
   end
 
   @impl Adapter
-  def start_link(journal_opts) do
-    with {:ok, configs} <- build_configs(journal_opts),
-         {:ok, pid}     <- do_start_link(configs) do
+  def start_link(opts) do
+    http_client = Keyword.get(opts, :http_client, __MODULE__.DefaultHTTPClient)
+    journal_opts = Keyword.get(opts, :journal_opts, %{})
+
+    with {:ok, configs} <- build_configs(http_client, journal_opts),
+         {:ok, pid}     <- do_start_link(http_client, configs) do
       memo = Agent.get(pid, & &1.memo)
       Agent.cast memo, fn _ ->
         Enum.reduce(configs, %{}, fn {journal_id, _}, acc ->
-          journal_memo =
-            case fetch_new(journal_id, 0, %{}, 15_000) do
-              {:ok, txns, offset} ->
-                %{next_offset: offset, transactions: txns, updated: now()}
-              _ ->
-                %{next_offset: 0, transactions: %{}, updated: now()}
-            end
-
-          Map.put(acc, journal_id, journal_memo)
+          Map.put(acc, journal_id, journal_memo(journal_id))
         end)
       end
       {:ok, pid}
     end
   end
 
-  @spec build_configs(%{required(Journal.id) => keyword}) :: {:ok, configs} | {:error, term}
-  defp build_configs(journal_opts) do
+  defp journal_memo(journal_id) do
+    case fetch_new(journal_id, 0, %{}, 15_000) do
+      {:ok, txns, offset} ->
+        %{next_offset: offset, transactions: txns, updated: now()}
+      _ ->
+        %{next_offset: 0, transactions: %{}, updated: now()}
+    end
+  end
+
+  @spec build_configs(module, %{required(Journal.id) => keyword}) :: {:ok, configs} | {:error, term}
+  defp build_configs(http_client, journal_opts) do
     Enum.reduce_while journal_opts, {:ok, %{}}, fn
       {journal_id, opts}, {:ok, acc} ->
-        case build_journal_config(opts) do
+        case build_journal_config(http_client, opts) do
           {:ok, config} -> {:cont, {:ok, Map.put(acc, journal_id, config)}}
           error -> {:halt, error}
         end
     end
   end
 
-  @spec build_journal_config(keyword) :: {:ok, journal_config} | {:error, term}
-  defp build_journal_config(opts) do
+  @spec build_journal_config(module, keyword) :: {:ok, journal_config} | {:error, term}
+  defp build_journal_config(http_client, opts) do
     consumer_key = Keyword.fetch!(opts, :consumer_key)
     credentials = %OAuther.Credentials{
       consumer_key: consumer_key,
@@ -72,7 +80,7 @@ defmodule Accounting.XeroAdapter do
       method: :rsa_sha1,
     }
 
-    with {:ok, cat_id} <- ensure_tracking_category_exists(credentials) do
+    with {:ok, cat_id} <- ensure_tracking_category_exists(http_client, credentials) do
       config = %{
         bank_account_id: Keyword.fetch!(opts, :bank_account_id),
         credentials: credentials,
@@ -82,23 +90,23 @@ defmodule Accounting.XeroAdapter do
     end
   end
 
-  @spec do_start_link(configs) :: Agent.on_start
-  defp do_start_link(configs) do
+  @spec do_start_link(module, configs) :: Agent.on_start
+  defp do_start_link(http_client, configs) do
     Agent.start_link fn ->
       {:ok, memo} = Agent.start_link(fn -> nil end)
-      %{configs: configs, memo: memo}
+      %{configs: configs, http_client: http_client, memo: memo}
     end, name: __MODULE__
   end
 
-  @spec ensure_tracking_category_exists(credentials) :: {:ok, String.t} | {:error, term}
-  defp ensure_tracking_category_exists(credentials) do
+  @spec ensure_tracking_category_exists(module, credentials) :: {:ok, String.t} | {:error, term}
+  defp ensure_tracking_category_exists(http_client, credentials) do
     "TrackingCategories/Category"
-    |> get(5_000, credentials)
-    |> ensure_tracking_category_exists(credentials)
+    |> http_client.get(5_000, credentials)
+    |> ensure_tracking_category_exists(http_client, credentials)
   end
 
-  @spec ensure_tracking_category_exists({:ok | :error, term}, %OAuther.Credentials{}) :: {:ok, String.t} | {:error, term}
-  defp ensure_tracking_category_exists({:ok, %{status_code: 200, body: "{" <> _ = json}}, _credentials) do
+  @spec ensure_tracking_category_exists({:ok | :error, term}, module, credentials) :: {:ok, String.t} | {:error, term}
+  defp ensure_tracking_category_exists({:ok, %{status_code: 200, body: "{" <> _ = json}}, _http_client, _credentials) do
     tracking_category_id =
       json
       |> Poison.decode!()
@@ -108,22 +116,27 @@ defmodule Accounting.XeroAdapter do
 
     {:ok, tracking_category_id}
   end
-  defp ensure_tracking_category_exists({:ok, %{status_code: 404}}, credentials) do
+  defp ensure_tracking_category_exists({:ok, %{status_code: 404}}, http_client, credentials) do
     "start_link.xml"
     |> render()
-    |> put("TrackingCategories", 5_000, credentials)
-    |> ensure_tracking_category_exists(credentials)
+    |> http_client.put("TrackingCategories", 5_000, credentials)
+    |> ensure_tracking_category_exists(http_client, credentials)
   end
-  defp ensure_tracking_category_exists({_, reasons}, _credentials) do
+  defp ensure_tracking_category_exists({_, reasons}, _http_client, _credentials) do
     {:error, reasons}
   end
 
   @impl Adapter
   def register_categories(journal_id, categories, timeout) when is_list(categories) do
-    id = Agent.get(__MODULE__, &get_in(&1, [:configs, journal_id, :tracking_category_id]), timeout)
+    creds = creds(journal_id)
+    id =
+      Agent.get(__MODULE__, fn state ->
+        get_in(state, [:configs, journal_id, :tracking_category_id])
+      end, timeout)
+
     "register_categories.xml"
     |> render(categories: categories)
-    |> put("TrackingCategories/#{id}/Options", timeout, credentials(journal_id))
+    |> http_client().put("TrackingCategories/#{id}/Options", timeout, creds)
     |> did_register_categories()
   end
 
@@ -149,7 +162,7 @@ defmodule Accounting.XeroAdapter do
 
     "register_account.xml"
     |> render(number: number, name: name)
-    |> put("Accounts", timeout, credentials(journal_id))
+    |> http_client().put("Accounts", timeout, creds(journal_id))
     |> did_register_account()
   end
 
@@ -182,66 +195,81 @@ defmodule Accounting.XeroAdapter do
   defp validation_errors(%{}), do: []
 
   @impl Adapter
-  def record_entry(journal_id, <<_::binary>> = party, %Date{} = date, [_|_] = line_items, timeout) do
-    total = line_items
-    |> Enum.reduce(0, & &1.amount + &2)
-
-    record_entry(journal_id, total, party, date, line_items, timeout)
+  def record_entries(journal_id, entries, timeout) do
+    case Enum.split_with(entries, & &1.total === 0) do
+      {_, []} -> post_invoices(journal_id, entries, timeout)
+      {[], _} -> post_bank_transactions(journal_id, entries, timeout)
+      _ -> {:error, :mixed_entries}
+    end
   end
 
-  @spec record_entry(Journal.id, integer, String.t, Date.t, [LineItem.t], timeout) :: :ok | {:error, term}
-  defp record_entry(journal_id, 0, party, date, line_items, timeout) do
-    "record_transfer.xml"
-    |> render(date: date, line_items: line_items, party: party)
-    |> put("Invoices", timeout, credentials(journal_id))
-    |> did_record_entry()
-  end
-  defp record_entry(journal_id, total, party, date, line_items, timeout) when total < 0 do
-    assigns = [
-      bank_account_id: bank_account_id(journal_id),
-      date: date,
-      line_items: for(l <- line_items, do: %{l | amount: -l.amount}),
-      party: party,
-    ]
+  @spec post_bank_transactions(Journal.id, [Entry.t], timeout) :: :ok | {:error, term}
+  defp post_bank_transactions(_journal_id, [], _timeout), do: :ok
+  defp post_bank_transactions(journal_id, entries, timeout) do
+    assigns = [bank_account_id: bank_account_id(journal_id), entries: entries]
+    params = [summarizeErrors: false]
 
-    "record_debit.xml"
+    "bank_transactions.xml"
     |> render(assigns)
-    |> put("BankTransactions", timeout, credentials(journal_id))
-    |> did_record_entry()
-  end
-  defp record_entry(journal_id, _, party, date, line_items, timeout) do
-    assigns = [
-      bank_account_id: bank_account_id(journal_id),
-      date: date,
-      line_items: line_items,
-      party: party,
-    ]
-
-    "record_credit.xml"
-    |> render(assigns)
-    |> put("BankTransactions", timeout, credentials(journal_id))
-    |> did_record_entry()
+    |> http_client().put("BankTransactions", timeout, creds(journal_id), params)
+    |> did_post_bank_transactions(entries)
   end
 
-  @spec did_record_entry({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}) :: :ok | {:error, :duplicate | HTTPoison.Error.t}
-  defp did_record_entry({:ok, %{status_code: 200}}), do: :ok
-  defp did_record_entry({_, reasons}), do: {:error, reasons}
+  @spec did_post_bank_transactions({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}, [Entry.t, ...]) :: :ok | {:error, HTTPoison.Error.t | HTTPoison.Response.t}
+  defp did_post_bank_transactions({:ok, %{body: json, status_code: 200}}, entries) do
+    bank_transactions =
+      json
+      |> Poison.decode!()
+      |> Map.fetch!("BankTransactions")
+
+    case extract_errors(bank_transactions, entries, []) do
+      [] -> :ok
+      errors -> {:error, errors}
+    end
+  end
+  defp did_post_bank_transactions({_, reasons}, _entries), do: {:error, reasons}
+
+  @spec post_invoices(Journal.id, [Entry.t], timeout) :: :ok | {:error, term}
+  defp post_invoices(_journal_id, [], _timeout), do: :ok
+  defp post_invoices(journal_id, entries, timeout) do
+    params = [summarizeErrors: false]
+
+    "invoices.xml"
+    |> render(entries: entries)
+    |> http_client().put("Invoices", timeout, creds(journal_id), params)
+    |> did_post_invoices(entries)
+  end
+
+  @spec did_post_invoices({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}, [Entry.t, ...]) :: :ok | {:error, HTTPoison.Error.t | HTTPoison.Response.t}
+  defp did_post_invoices({:ok, %{body: json, status_code: 200}}, entries) do
+    invoices =
+      json
+      |> Poison.decode!()
+      |> Map.fetch!("Invoices")
+
+    case extract_errors(invoices, entries, []) do
+      [] -> :ok
+      errors -> {:error, errors}
+    end
+  end
+  defp did_post_invoices({_, reasons}, _entries), do: {:error, reasons}
+
+  @spec extract_errors([map], [Entry.t], [Entry.Error.t]) :: [Entry.Error.t]
+  defp extract_errors([], _, acc), do: Enum.reverse(acc)
+  defp extract_errors([map|maps], [entry|entries], acc) do
+    case Map.get(map, "ValidationErrors", []) do
+      [] ->
+        extract_errors(maps, entries, acc)
+      validation_errors ->
+        errors = for e <- validation_errors, do: e["Message"]
+        new_acc = [%Entry.Error{entry: entry, errors: errors}|acc]
+        extract_errors(maps, entries, new_acc)
+    end
+  end
 
   @spec bank_account_id(Journal.id) :: String.t
   defp bank_account_id(journal_id) do
     Agent.get(__MODULE__, & &1.configs[journal_id].bank_account_id)
-  end
-
-  @spec put(String.t, String.t, timeout, %OAuther.Credentials{}) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
-  defp put(xml, endpoint, timeout, credentials) do
-    url = "https://api.xero.com/api.xro/2.0/#{endpoint}"
-    {oauth_header, _} =
-      "put"
-      |> OAuther.sign(url, [], credentials)
-      |> OAuther.header()
-
-    HTTPoison.put url, xml, [oauth_header, {"Accept", "application/json"}],
-      recv_timeout: timeout
   end
 
   @impl Adapter
@@ -286,7 +314,9 @@ defmodule Accounting.XeroAdapter do
 
   @spec fetch_new(Journal.id, offset, map, timeout) :: {:ok, map, offset} | {:error, term}
   defp fetch_new(journal_id, offset, acc, timeout) do
-    case get("Journals", timeout, credentials(journal_id), offset: offset) do
+    creds = creds(journal_id)
+
+    case http_client().get("Journals", timeout, creds, offset: offset) do
       {:ok, %{body: "{" <> _ = json}} ->
         journals =
           json
@@ -350,21 +380,11 @@ defmodule Accounting.XeroAdapter do
     |> Map.fetch!("JournalNumber")
   end
 
-  @spec get(String.t, timeout, credentials, keyword) :: {:ok, HTTPoison.Response.t} | {:error, HTTPoison.Error.t}
-  defp get(endpoint, timeout, credentials, params \\ []) do
-    query = URI.encode_query(params)
-    url = "https://api.xero.com/api.xro/2.0/#{endpoint}?#{query}"
-    {oauth_header, _} =
-      "get"
-      |> OAuther.sign(url, [], credentials)
-      |> OAuther.header()
-
-    HTTPoison.get url, [oauth_header, {"Accept", "application/json"}],
-      recv_timeout: timeout
-  end
-
-  @spec credentials(Journal.id) :: %OAuther.Credentials{}
-  defp credentials(journal_id) do
+  @spec creds(Journal.id) :: credentials
+  defp creds(journal_id) do
     Agent.get(__MODULE__, &Map.fetch!(&1.configs, journal_id)).credentials
   end
+
+  @spec http_client() :: module
+  defp http_client, do: Agent.get(__MODULE__, &Map.fetch!(&1, :http_client))
 end
