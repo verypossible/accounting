@@ -99,9 +99,7 @@ defmodule Accounting.TestAdapterTest do
       assert {:error, :no_such_account} ===
         TestAdapter.record_entries(journal_id, [entry], :infinity)
 
-      for i <- items do
-        assert_received {:transaction, ^journal_id, ^party, ^date, ^i}
-      end
+      assert_received {:recorded_entries, ^journal_id, [^entry]}
 
       assert {:ok, %{^number => account}} =
         TestAdapter.fetch_accounts(journal_id, [number], :infinity)
@@ -126,7 +124,7 @@ defmodule Accounting.TestAdapterTest do
       assert :ok ===
         TestAdapter.record_entries(journal_id, [entry], :infinity)
 
-      assert_received {:transaction, ^journal_id, ^party, ^date, ^item}
+      assert_received {:recorded_entries, ^journal_id, [^entry]}
 
       assert {:ok, %{^number => account}} =
         TestAdapter.fetch_accounts(journal_id, [number], :infinity)
@@ -159,13 +157,14 @@ defmodule Accounting.TestAdapterTest do
         amount: amount2,
         description: desc2,
       }
-      entry1 = Entry.new(party1, date1, [item1])
-      entry2 = Entry.new(party2, date2, [item2])
+      entries = [
+        Entry.new(party1, date1, [item1]),
+        Entry.new(party2, date2, [item2]),
+      ]
       assert :ok ===
-        TestAdapter.record_entries(journal_id, [entry1, entry2], :infinity)
+        TestAdapter.record_entries(journal_id, entries, :infinity)
 
-      assert_received {:transaction, ^journal_id, ^party1, ^date1, ^item1}
-      assert_received {:transaction, ^journal_id, ^party2, ^date2, ^item2}
+      assert_received {:recorded_entries, ^journal_id, ^entries}
 
       assert {:ok, %{^number1 => account1, ^number2 => account2}} =
         TestAdapter.fetch_accounts(journal_id, [number1, number2], :infinity)
@@ -193,7 +192,7 @@ defmodule Accounting.TestAdapterTest do
       assert {:error, :duplicate} ===
         TestAdapter.register_account(journal_id, number, name, :infinity)
 
-      assert_received {:created_account, ^journal_id, ^number}
+      assert_received {:registered_account, ^journal_id, ^number}
     end
 
     test "with a new account", %{name: name, number: number} do
@@ -201,7 +200,7 @@ defmodule Accounting.TestAdapterTest do
       assert :ok ===
         TestAdapter.register_account(journal_id, number, name, :infinity)
 
-      assert_received {:created_account, ^journal_id, ^number}
+      assert_received {:registered_account, ^journal_id, ^number}
     end
   end
 
@@ -211,9 +210,7 @@ defmodule Accounting.TestAdapterTest do
     assert :ok ===
       TestAdapter.register_categories(journal_id, categories, :infinity)
 
-    for c <- categories do
-      assert_received {:registered_category, ^journal_id, ^c}
-    end
+    assert_received {:registered_categories, ^journal_id, ^categories}
   end
 
   test "reset/0" do

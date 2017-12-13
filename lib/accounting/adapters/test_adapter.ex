@@ -10,7 +10,6 @@ defmodule Accounting.TestAdapter do
     Entry,
     Helpers,
     Journal,
-    LineItem,
   }
   import Helpers, only: [sort_transactions: 1]
 
@@ -46,6 +45,7 @@ defmodule Accounting.TestAdapter do
 
   @impl Adapter
   def record_entries(journal_id, entries, _timeout) do
+    send self(), {:recorded_entries, journal_id, entries}
     Enum.reduce_while entries, :ok, fn e, _ ->
       case record_entry(journal_id, e) do
         :ok -> {:cont, :ok}
@@ -54,17 +54,13 @@ defmodule Accounting.TestAdapter do
     end
   end
 
-  @spec record_entry(Journal.id, %Entry{date: Date.t, line_items: [LineItem.t, ...] , party: String.t}) :: :ok | {:error, :no_such_account}
+  @spec record_entry(Journal.id, Entry.t) :: :ok | {:error, :no_such_account}
   defp record_entry(journal_id, entry) do
     %Entry{
       date: %Date{} = date,
       line_items: [_|_] = line_items,
-      party: <<_::binary>> = party,
+      party: <<_::binary>>,
     } = entry
-
-    for item <- line_items do
-      send self(), {:transaction, journal_id, party, date, item}
-    end
 
     if all_exist?(journal_id, (for i <- line_items, do: i.account_number)) do
       Agent.update __MODULE__, fn state ->
@@ -95,7 +91,7 @@ defmodule Accounting.TestAdapter do
 
   @impl Adapter
   def register_account(journal_id, number, _description, _timeout) do
-    send self(), {:created_account, journal_id, number}
+    send self(), {:registered_account, journal_id, number}
 
     if exists?(journal_id, number) do
       {:error, :duplicate}
@@ -118,7 +114,7 @@ defmodule Accounting.TestAdapter do
 
   @impl Adapter
   def register_categories(journal_id, categories, _timeout) do
-    for c <- categories, do: send self(), {:registered_category, journal_id, c}
+    send self(), {:registered_categories, journal_id, categories}
     :ok
   end
 

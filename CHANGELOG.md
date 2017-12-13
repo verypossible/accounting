@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.10.0 (2017-12-13)
+
+### 1. Enhancements
+
+  * [Assertions] Add `assert_registered_categories/2`
+  * [Assertions] Add `assert_recorded_entries/2`
+
+### 2. Removals
+
+  * [Assertions] `assert_registered_category/2`, in favor of `assert_registered_categories/2`
+  * [Assertions] `assert_transaction_with_line_item/4`, in favor of `assert_recorded_entries/2`
+
 ## v0.9.0 (2017-12-11)
 
 ### 1. Enhancements

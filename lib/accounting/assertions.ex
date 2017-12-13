@@ -3,50 +3,58 @@ defmodule Accounting.Assertions do
   This module contains a set of assertion functions.
   """
 
-  alias Accounting.Journal
+  alias Accounting.{Entry, Journal}
   import ExUnit.Assertions, only: [flunk: 1]
 
   @timeout 100
 
-  @spec assert_registered_category(Journal.id, String.t) :: true | no_return
-  def assert_registered_category(journal_id, category) do
+  @spec assert_registered_categories(Journal.id, [String.t]) :: true | no_return
+  def assert_registered_categories(journal_id, categories) do
     receive do
-      {:registered_category, ^journal_id, ^category} -> true
+      {:registered_categories, ^journal_id, ^categories} -> true
     after
       @timeout ->
-        flunk "Category '#{category}' was not registered."
+        flunk """
+        Categories were not registered:
+
+        #{inspect categories}
+        """
     end
   end
 
   @spec assert_created_account(Journal.id, String.t) :: true | no_return
   def assert_created_account(journal_id, number) do
     receive do
-      {:created_account, ^journal_id, ^number} -> true
+      {:registered_account, ^journal_id, ^number} -> true
     after
       @timeout ->
         flunk "An account was not created with the number '#{number}'."
     end
   end
 
-  @spec assert_transaction_with_line_item(Journal.id, String.t, Date.t, [Accounting.LineItem.t]) :: true | no_return
-  def assert_transaction_with_line_item(journal_id, party, date, line_item) do
+  @spec assert_recorded_entries(Journal.id, [Entry.t]) :: true | no_return
+  def assert_recorded_entries(journal_id, entries) do
     receive do
-      {:transaction, ^journal_id, ^party, ^date, ^line_item} -> true
+      {:recorded_entries, ^journal_id, ^entries} -> true
     after
       @timeout ->
         flunk """
-        Transaction did not occur with '#{party}' on #{date} with the line item:
+        Entries were not recorded:
 
-        #{inspect line_item}
+        #{inspect entries}
         """
     end
   end
 
-  @spec refute_transaction(Journal.id, String.t, Date.t) :: true | no_return
-  def refute_transaction(journal_id, from, date) do
+  @spec refute_recorded_entries(Journal.id, [Entry.t]) :: true | no_return
+  def refute_recorded_entries(journal_id, entries) do
     receive do
-      {:transaction, ^journal_id, ^from, ^date, _} ->
-        flunk "Unexpected transaction occurred."
+      {:recorded_entries, ^journal_id, ^entries} ->
+        flunk """
+        Unexpected entries were recorded:
+
+        #{inspect entries}
+        """
     after
       @timeout -> true
     end
