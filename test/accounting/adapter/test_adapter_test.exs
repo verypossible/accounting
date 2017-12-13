@@ -1,5 +1,5 @@
 defmodule Accounting.TestAdapterTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
   doctest Accounting.TestAdapter
 
   alias Accounting.{Account, Entry, LineItem, TestAdapter}
