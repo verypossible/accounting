@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 1. Enhancements
+
+  * [Entry] Update Inspect implementation to output line_items.
+
 ## v0.10.0 (2017-12-13)
 
 ### 1. Enhancements

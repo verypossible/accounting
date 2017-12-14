@@ -25,20 +25,4 @@ defmodule Accounting.Entry do
       total: total,
     }
   end
-
-  defimpl Inspect do
-    def inspect(entry, opts) do
-      docs = [
-        "#Entry<party: ",
-        entry.party,
-        ", date: ",
-        Inspect.Algebra.to_doc(entry.date, opts),
-        ", total: ",
-        Inspect.Algebra.to_doc(entry.total, opts),
-        ">",
-      ]
-
-      Inspect.Algebra.concat(docs)
-    end
-  end
 end

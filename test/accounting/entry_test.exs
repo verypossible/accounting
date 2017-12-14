@@ -18,15 +18,4 @@ defmodule Accounting.EntryTest do
     assert line_items === entry.line_items
     assert 5 === entry.total
   end
-
-  test "Inspect implementation" do
-    party = "ah yeah williams"
-    date = ~D[1934-10-10]
-    line_items = [
-      %LineItem{account_number: "n", amount: 3, description: "three"},
-      %LineItem{account_number: "n", amount: 4, description: "four"},
-    ]
-    assert "#Entry<party: #{party}, date: ~D[1934-10-10], total: 7>" ===
-      inspect(Entry.new(party, date, line_items))
-  end
 end
