@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.10.1 (2017-12-15)
 
 ### 1. Enhancements
 
+  * [Assertions] Add `refute_registered_categories/2`
   * [Entry] Update Inspect implementation to output line_items.
 
 ## v0.10.0 (2017-12-13)
