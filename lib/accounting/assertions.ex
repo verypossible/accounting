@@ -22,6 +22,20 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec refute_registered_categories(Journal.id, [String.t]) :: true | no_return
+  def refute_registered_categories(journal_id, categories) do
+    receive do
+      {:registered_categories, ^journal_id, ^categories} ->
+        flunk """
+        Unexpected categories were registered:
+
+        #{inspect categories}
+        """
+    after
+      @timeout -> true
+    end
+  end
+
   @spec assert_created_account(Journal.id, String.t) :: true | no_return
   def assert_created_account(journal_id, number) do
     receive do
