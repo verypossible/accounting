@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.2 (2017-12-19)
+
+### 1. Enhancements
+
+  * [Journal] Add `list_accounts/2`
+
 ## v0.10.1 (2017-12-15)
 
 ### 1. Enhancements

@@ -9,6 +9,20 @@ defmodule Accounting.TestAdapterTest do
     :ok
   end
 
+  describe "list_accounts/2" do
+    test "without any registered accounts" do
+      assert {:ok, []} === TestAdapter.list_accounts(:blue_journal, :infinity)
+    end
+
+    test "with a registered account" do
+      journal_id = :black_journal
+      number = "F1234"
+      :ok = TestAdapter.register_account(journal_id, number, nil, :infinity)
+
+      assert {:ok, [number]} === TestAdapter.list_accounts(journal_id, :infinity)
+    end
+  end
+
   describe "fetch_accounts/2" do
     setup do: %{number: "F100"}
 

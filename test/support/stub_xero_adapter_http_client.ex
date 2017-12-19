@@ -18,8 +18,18 @@ defmodule StubXeroAdapterHTTPClient do
     body = Poison.encode!(value)
     {:ok, %HTTPoison.Response{status_code: 200, headers: [], body: body}}
   end
+  def get(endpoint, 1 = timeout, credentials, params) do
+    send self(), {:http_get, endpoint, timeout, credentials, params}
+    {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}}
+  end
   def get("Journals", _, _, _) do
     body = Poison.encode!(%{"Journals" => []})
+    {:ok, %HTTPoison.Response{status_code: 200, headers: [], body: body}}
+  end
+  def get("Accounts", _, _, _) do
+    body = Poison.encode!(
+      %{"Accounts" => [%{"Code" => "F1234"}, %{"Code" => "G1234"}]}
+    )
     {:ok, %HTTPoison.Response{status_code: 200, headers: [], body: body}}
   end
   def get(endpoint, timeout, credentials, params) do

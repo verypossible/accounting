@@ -273,6 +273,19 @@ defmodule Accounting.XeroAdapter do
   end
 
   @impl Adapter
+  def list_accounts(journal_id, timeout) do
+    creds = creds(journal_id)
+    with {:ok, resp} <- http_client().get("Accounts", timeout, creds) do
+      resp.body
+      |> Poison.decode!
+      |> Map.fetch!("Accounts")
+      |> Stream.map(&(Map.get(&1, "Code")))
+      |> Enum.filter(&(&1))
+      |> (&({:ok, &1})).()
+    end
+  end
+
+  @impl Adapter
   def fetch_accounts(journal_id, numbers, timeout) when is_list(numbers) do
     memo = Agent.get(__MODULE__, & &1.memo, timeout)
     Agent.get_and_update memo, fn %{^journal_id => journal_memo} = state ->

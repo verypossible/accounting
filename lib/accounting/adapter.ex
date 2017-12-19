@@ -8,6 +8,7 @@ defmodule Accounting.Adapter do
   @typep account_number :: Accounting.account_number
 
   @callback child_spec(keyword) :: Supervisor.child_spec
+  @callback list_accounts(Journal.id, timeout) :: {:ok, [account_number]} | {:error, term}
   @callback fetch_accounts(Journal.id, [account_number], timeout) :: {:ok, Journal.accounts} | {:error, term}
   @callback record_entries(Journal.id, [Entry.t, ...], timeout) :: :ok | {:error, [Entry.Error.t] | term}
   @callback register_account(Journal.id, account_number, String.t, timeout) :: :ok | {:error, term}

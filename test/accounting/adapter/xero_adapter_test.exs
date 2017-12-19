@@ -35,6 +35,20 @@ defmodule Accounting.XeroAdapterTest do
     }
   end
 
+  describe "list_accounts/2" do
+    test "returns HTTPoison errors", %{creds: creds, journal_id: journal_id} do
+      assert {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}} ===
+        XeroAdapter.list_accounts(journal_id, 1)
+
+      assert_received {:http_get, "Accounts", 1, ^creds, []}
+    end
+
+    test "returns a list of account numbers", %{journal_id: journal_id} do
+      assert {:ok, ["F1234", "G1234"]} ===
+        XeroAdapter.list_accounts(journal_id, :infinity)
+    end
+  end
+
   describe "record_entries/3" do
     test "returns HTTPoison errors", %{bank_id: bank_id, creds: creds, journal_id: journal_id, params: params} do
       item = %LineItem{account_number: "B42", amount: 4_99, description: "Soap"}
