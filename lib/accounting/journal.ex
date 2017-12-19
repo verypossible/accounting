@@ -17,6 +17,11 @@ defmodule Accounting.Journal do
     %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
   end
 
+  @spec list_accounts(Journal.id, timeout) :: {:ok, [account_number]} | {:error, term}
+  def list_accounts(journal_id, timeout \\ @default_timeout) do
+    adapter().list_accounts(journal_id, timeout)
+  end
+
   @spec fetch_accounts(Journal.id, [account_number], timeout) :: {:ok, accounts} | {:error, term}
   def fetch_accounts(journal_id, numbers, timeout \\ @default_timeout) do
     adapter().fetch_accounts(journal_id, numbers, timeout)

@@ -25,6 +25,17 @@ defmodule Accounting.TestAdapter do
   end
 
   @impl Adapter
+  def list_accounts(journal_id, _timeout) do
+    accounts = Agent.get(__MODULE__, fn(state) ->
+      state
+      |> Map.get(journal_id, %{})
+      |> Map.keys()
+    end)
+
+    {:ok, accounts}
+  end
+
+  @impl Adapter
   def fetch_accounts(journal_id, numbers, _timeout) do
     {:ok, Agent.get(__MODULE__, &get_accounts(&1, journal_id, numbers))}
   end
