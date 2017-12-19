@@ -46,6 +46,17 @@ defmodule Accounting.Assertions do
     end
   end
 
+  @spec refute_created_account(Journal.id, String.t) :: true | no_return
+  def refute_created_account(journal_id, number) do
+    receive do
+      {:registered_account, ^journal_id, ^number} ->
+        flunk "An account was unexpectedly created with the number '#{number}'."
+    after
+      @timeout ->
+        true
+    end
+  end
+
   @spec assert_recorded_entries(Journal.id, [Entry.t]) :: true | no_return
   def assert_recorded_entries(journal_id, entries) do
     receive do

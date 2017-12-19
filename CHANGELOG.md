@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.3 (2017-12-19)
+
+### 1. Enhancements
+
+  * [Assertions] Add `refute_account_created/2`
+
 ## v0.10.2 (2017-12-19)
 
 ### 1. Enhancements
