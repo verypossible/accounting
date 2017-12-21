@@ -35,6 +35,16 @@ defmodule Accounting.XeroAdapterTest do
     }
   end
 
+  describe "setup_accounts/3" do
+    test "returns HTTPoison errors"
+    test "creates a list of accounts"
+  end
+
+  describe "setup_account_conversions/3" do
+    test "returns HTTPoison errors"
+    test "sets the conversion balance for accounts"
+  end
+
   describe "list_accounts/2" do
     test "returns HTTPoison errors", %{creds: creds, journal_id: journal_id} do
       assert {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}} ===

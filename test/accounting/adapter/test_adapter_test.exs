@@ -9,6 +9,10 @@ defmodule Accounting.TestAdapterTest do
     :ok
   end
 
+  test "setup_accounts/3"
+
+  test "setup_account_conversions/3"
+
   describe "list_accounts/2" do
     test "without any registered accounts" do
       assert {:ok, []} === TestAdapter.list_accounts(:blue_journal, :infinity)

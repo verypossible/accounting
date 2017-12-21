@@ -5,11 +5,20 @@ defmodule Accounting.Account do
 
   alias Accounting.AccountTransaction
 
-  @opaque t :: %__MODULE__{number: account_number, transactions: [AccountTransaction.t]}
+  @type setup :: %__MODULE__{
+    number: account_number,
+    description: String.t,
+    conversion_balance: integer,
+  }
+
+  @opaque t :: %__MODULE__{
+    number: account_number,
+    transactions: [AccountTransaction.t]
+  }
 
   @typep account_number :: Accounting.account_number
 
-  defstruct [:number, {:transactions, []}]
+  defstruct [:number, :description, :conversion_balance, {:transactions, []}]
 
   @spec average_daily_balance(t, Date.Range.t) :: integer
   def average_daily_balance(%__MODULE__{} = account, %Date.Range{} = date_range) do
