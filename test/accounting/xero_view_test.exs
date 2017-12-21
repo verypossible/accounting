@@ -4,6 +4,68 @@ defmodule Accounting.XeroViewTest do
 
   alias Accounting.{Entry, LineItem, XeroView}
 
+  test "render setup_accounts.xml" do
+    assigns = [
+      accounts: [
+        [number: "1", name: "Moe"],
+        [number: "2", name: "Curly"],
+      ],
+    ]
+
+    xml = """
+    <Setup>
+      <Accounts>
+        <Account>
+          <Code>1</Code>
+          <Name>Moe</Name>
+          <Type>CURRLIAB</Type>
+        </Account>
+        <Account>
+          <Code>2</Code>
+          <Name>Curly</Name>
+          <Type>CURRLIAB</Type>
+        </Account>
+      </Accounts>
+    </Setup>
+    """
+
+    result = XeroView.render("setup_accounts.xml", assigns)
+    assert remove_whitespace(xml) === remove_whitespace(result)
+  end
+
+  test "render setup_account_conversions.xml" do
+    assigns = [
+      month: 1,
+      year: 2014,
+      accounts: [
+        [number: "1", conversion_balance: "5.00"],
+        [number: "2", conversion_balance: "-2.00"],
+      ],
+    ]
+
+    xml = """
+    <Setup>
+      <ConversionDate>
+        <Month>1</Month>
+        <Year>2014</Year>
+      </ConversionDate>
+      <ConversionBalances>
+        <ConversionBalance>
+          <AccountCode>1</AccountCode>
+          <Balance>5.00</Balance>
+        </ConversionBalance>
+        <ConversionBalance>
+          <AccountCode>2</AccountCode>
+          <Balance>-2.00</Balance>
+        </ConversionBalance>
+      </ConversionBalances>
+    </Setup>
+    """
+
+    result = XeroView.render("setup_account_conversions.xml", assigns)
+    assert remove_whitespace(xml) === remove_whitespace(result)
+  end
+
   test "render bank_transactions.xml with a single net-positive entry" do
     line_items = [
       %LineItem{account_number: "num", amount: 1, description: "boom"},

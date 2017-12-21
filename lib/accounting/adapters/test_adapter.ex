@@ -25,6 +25,25 @@ defmodule Accounting.TestAdapter do
   end
 
   @impl Adapter
+  def setup_accounts(journal_id, accounts, _timeout) do
+    send self(), {:setup_accounts, journal_id, accounts}
+
+    Agent.update(__MODULE__, fn(state) ->
+      journal_state = Enum.reduce(accounts, %{}, fn(account, acc) ->
+        Map.put(acc, account.number, [])
+      end)
+
+      Map.put(state, journal_id, journal_state)
+    end)
+  end
+
+  @impl Adapter
+  def setup_account_conversions(journal_id, month, year, accounts, _timeout) do
+    send self(), {:setup_account_conversions, journal_id, month, year, accounts}
+    :ok
+  end
+
+  @impl Adapter
   def list_accounts(journal_id, _timeout) do
     accounts = Agent.get(__MODULE__, fn(state) ->
       state
@@ -38,6 +57,17 @@ defmodule Accounting.TestAdapter do
   @impl Adapter
   def fetch_accounts(journal_id, numbers, _timeout) do
     {:ok, Agent.get(__MODULE__, &get_accounts(&1, journal_id, numbers))}
+  end
+
+  @impl Adapter
+  def register_account(journal_id, number, _description, _timeout) do
+    send self(), {:registered_account, journal_id, number}
+
+    if exists?(journal_id, number) do
+      {:error, :duplicate}
+    else
+      Agent.update(__MODULE__, &put_account(&1, journal_id, number))
+    end
   end
 
   @spec get_accounts(state, Journal.id, [account_number]) :: Journal.accounts
@@ -97,17 +127,6 @@ defmodule Accounting.TestAdapter do
   defp all_exist?(journal_id, account_numbers) do
     Agent.get __MODULE__, fn state ->
       Enum.all?(account_numbers, &Map.has_key?(state[journal_id] || %{}, &1))
-    end
-  end
-
-  @impl Adapter
-  def register_account(journal_id, number, _description, _timeout) do
-    send self(), {:registered_account, journal_id, number}
-
-    if exists?(journal_id, number) do
-      {:error, :duplicate}
-    else
-      Agent.update(__MODULE__, &put_account(&1, journal_id, number))
     end
   end
 

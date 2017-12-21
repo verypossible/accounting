@@ -4,9 +4,62 @@ defmodule Accounting.TestAdapterTest do
 
   alias Accounting.{Account, Entry, LineItem, TestAdapter}
 
+  import Accounting.Assertions
+
   setup do
     {:ok, _} = TestAdapter.start_link([])
     :ok
+  end
+
+  describe "setup_accounts/3" do
+    test "creating new accounts" do
+      journal_id = :pink_journal
+      accounts = [
+        %Account{number: "R1234", description: "Rob Robertson"},
+        %Account{number: "T1234", description: "Tom Thompson"},
+        %Account{number: "D1234", description: "Don Donaldson"},
+        %Account{number: "J1234", description: "James Jameson"},
+      ]
+      assert :ok ===
+        TestAdapter.setup_accounts(journal_id, accounts, :infinity)
+
+      assert_setup_accounts(journal_id, accounts)
+    end
+
+    test "accounts are overwritten" do
+      journal_id = :black_journal
+      number = "F1234"
+      accounts = [
+        %Account{number: "R1234", description: "Rob Robertson"},
+        %Account{number: "T1234", description: "Tom Thompson"},
+        %Account{number: "D1234", description: "Don Donaldson"},
+        %Account{number: "J1234", description: "James Jameson"},
+      ]
+      :ok = TestAdapter.register_account(journal_id, number, nil, :infinity)
+
+      assert {:ok, [number]} === TestAdapter.list_accounts(journal_id, :infinity)
+      assert :ok === TestAdapter.setup_accounts(journal_id, accounts, :infinity)
+      assert {:ok, ["D1234", "J1234", "R1234", "T1234"]} ===
+        TestAdapter.list_accounts(journal_id, :infinity)
+
+      assert_setup_accounts(journal_id, accounts)
+    end
+  end
+
+  test "setup_account_conversions/3" do
+    journal_id = :black_and_blue_journal
+    accounts = [
+      %Account{number: "R1234", conversion_balance: 1_99},
+      %Account{number: "T1234", conversion_balance: -2_32},
+      %Account{number: "D1234", conversion_balance: 1_54},
+      %Account{number: "J1234", conversion_balance: -6_32},
+    ]
+
+    assert :ok === TestAdapter.setup_account_conversions(
+      journal_id, 1, 2017, accounts, :infinity
+    )
+
+    assert_setup_account_conversions(journal_id, 1, 2017, accounts)
   end
 
   describe "list_accounts/2" do

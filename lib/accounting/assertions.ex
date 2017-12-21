@@ -3,7 +3,7 @@ defmodule Accounting.Assertions do
   This module contains a set of assertion functions.
   """
 
-  alias Accounting.{Entry, Journal}
+  alias Accounting.{Account, Entry, Journal}
   import ExUnit.Assertions, only: [flunk: 1]
 
   @timeout 100
@@ -30,6 +30,63 @@ defmodule Accounting.Assertions do
         Unexpected categories were registered:
 
         #{inspect categories}
+        """
+    after
+      @timeout -> true
+    end
+  end
+
+  @spec assert_setup_accounts(Journal.id, [Account.setup, ...]) :: true | no_return
+  def assert_setup_accounts(journal_id, accounts) do
+    receive do
+      {:setup_accounts, ^journal_id, ^accounts} -> true
+    after
+      @timeout ->
+        flunk """
+        Accounts were not registered:
+
+        #{inspect accounts}
+        """
+    end
+  end
+
+  @spec refute_setup_accounts(Journal.id, [Account.setup, ...]) :: true | no_return
+  def refute_setup_accounts(journal_id, accounts) do
+    receive do
+      {:setup_accounts, ^journal_id, ^accounts} ->
+        flunk """
+        Unexpected accounts were registered:
+
+        #{inspect accounts}
+        """
+    after
+      @timeout -> true
+    end
+  end
+
+  @spec assert_setup_account_conversions(Journal.id, 1..12, pos_integer, [Account.setup, ...]) :: true | no_return
+  def assert_setup_account_conversions(journal_id, month, year, accounts) do
+    receive do
+      {:setup_account_conversions, ^journal_id, ^month, ^year, ^accounts} ->
+        true
+    after
+      @timeout ->
+        flunk """
+        Account conversion balances were not set:
+
+        #{inspect accounts}
+        """
+    end
+  end
+
+  @spec refute_setup_account_conversions(Journal.id, 1..12, pos_integer, [Account.setup, ...]) :: true | no_return
+  def refute_setup_account_conversions(journal_id, month, year, accounts) do
+    receive do
+      {:setup_account_conversions, ^journal_id, ^month, ^year, ^accounts} ->
+        flunk """
+        Unexpected account conversion balances were set:
+
+        #{inspect accounts}
         """
     after
       @timeout -> true

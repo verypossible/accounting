@@ -17,6 +17,16 @@ defmodule Accounting.Journal do
     %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
   end
 
+  @spec setup_accounts(Journal.id, [Account.setup, ...], timeout) :: :ok | {:error, term}
+  def setup_accounts(journal_id, accounts, timeout \\ @default_timeout) do
+    adapter().setup_accounts(journal_id, accounts, timeout)
+  end
+
+  @spec setup_account_conversions(Journal.id, 1..12, pos_integer, [Account.setup, ...], timeout) :: :ok | {:error, term}
+  def setup_account_conversions(journal_id, month, year, accounts, timeout \\ @default_timeout) do
+    adapter().setup_account_conversions(journal_id, month, year, accounts, timeout)
+  end
+
   @spec list_accounts(Journal.id, timeout) :: {:ok, [account_number]} | {:error, term}
   def list_accounts(journal_id, timeout \\ @default_timeout) do
     adapter().list_accounts(journal_id, timeout)
@@ -27,11 +37,6 @@ defmodule Accounting.Journal do
     adapter().fetch_accounts(journal_id, numbers, timeout)
   end
 
-  @spec record_entries(Journal.id, [Entry.t, ...], timeout) :: :ok | {:error, term}
-  def record_entries(journal_id, [_|_] = entries, timeout \\ @default_timeout) do
-    adapter().record_entries(journal_id, entries, timeout)
-  end
-
   @spec register_account(Journal.id, account_number, String.t, timeout) :: :ok | {:error, term}
   def register_account(journal_id, number, description, timeout \\ @default_timeout) do
     adapter().register_account(journal_id, number, description, timeout)
@@ -40,6 +45,11 @@ defmodule Accounting.Journal do
   @spec register_categories(Journal.id, [atom], timeout) :: :ok | {:error, term}
   def register_categories(journal_id, categories, timeout \\ @default_timeout) do
     adapter().register_categories(journal_id, categories, timeout)
+  end
+
+  @spec record_entries(Journal.id, [Entry.t, ...], timeout) :: :ok | {:error, term}
+  def record_entries(journal_id, [_|_] = entries, timeout \\ @default_timeout) do
+    adapter().record_entries(journal_id, entries, timeout)
   end
 
   @spec adapter() :: module

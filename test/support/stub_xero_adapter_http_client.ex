@@ -38,6 +38,17 @@ defmodule StubXeroAdapterHTTPClient do
   end
 
   @impl XeroAdapter.HTTPClient
+  def post(xml, endpoint, timeout, credentials, params \\ [])
+  def post(xml, endpoint, 1 = timeout, credentials, params) do
+    send self(), {:http_post, xml, endpoint, timeout, credentials, params}
+    {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}}
+  end
+  def post(xml, endpoint, timeout, credentials, params) do
+    send self(), {:http_post, xml, endpoint, timeout, credentials, params}
+    {:ok, %HTTPoison.Response{status_code: 200, headers: []}}
+  end
+
+  @impl XeroAdapter.HTTPClient
   def put(xml, endpoint, timeout, credentials, params \\ []) do
     send self(), {:http_put, xml, endpoint, timeout, credentials, params}
     case endpoint do
