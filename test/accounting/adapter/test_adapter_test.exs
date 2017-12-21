@@ -44,7 +44,27 @@ defmodule Accounting.TestAdapterTest do
     end
   end
 
-  test "setup_account_conversions/3"
+  test "setup_account_conversions/3" do
+    journal_id = :black_and_blue_journal
+    accounts = [
+      %Account{number: "R1234", description: "Rob Robertson"},
+      %Account{number: "T1234", description: "Tom Thompson"},
+      %Account{number: "D1234", description: "Don Donaldson"},
+      %Account{number: "J1234", description: "James Jameson"},
+    ]
+
+    assert :ok === TestAdapter.setup_account_conversions(
+      journal_id, 1, 2017, accounts, :infinity
+    )
+
+    assert_received {
+      :setup_account_conversions,
+      ^journal_id,
+      1,
+      2017,
+      ^accounts
+    }
+  end
 
   describe "list_accounts/2" do
     test "without any registered accounts" do

@@ -38,6 +38,12 @@ defmodule Accounting.TestAdapter do
   end
 
   @impl Adapter
+  def setup_account_conversions(journal_id, month, year, accounts, _timeout) do
+    send self(), {:setup_account_conversions, journal_id, month, year, accounts}
+    :ok
+  end
+
+  @impl Adapter
   def list_accounts(journal_id, _timeout) do
     accounts = Agent.get(__MODULE__, fn(state) ->
       state
