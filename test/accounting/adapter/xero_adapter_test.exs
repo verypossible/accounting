@@ -101,7 +101,7 @@ defmodule Accounting.XeroAdapterTest do
         year: year,
         accounts: [
           [number: "R1234", conversion_balance: "1.99"],
-          [number: "T1233", conversion_balance: "-2.32"],
+          [number: "T1234", conversion_balance: "-2.32"],
         ],
       ]
       assert XeroView.render("setup_account_conversions.xml", assigns) === xml
@@ -121,7 +121,7 @@ defmodule Accounting.XeroAdapterTest do
         year: year,
         accounts: [
           [number: "R1234", conversion_balance: "1.99"],
-          [number: "T1233", conversion_balance: "-2.32"],
+          [number: "T1234", conversion_balance: "-2.32"],
         ],
       ]
       assert XeroView.render("setup_account_conversions.xml", assigns) === xml

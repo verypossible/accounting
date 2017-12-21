@@ -3,7 +3,7 @@ defmodule Accounting.Adapter do
   A behaviour module for implementing the adapter for a particular journal.
   """
 
-  alias Accounting.{Entry, Journal}
+  alias Accounting.{Account, Entry, Journal}
 
   @typep account_number :: Accounting.account_number
 

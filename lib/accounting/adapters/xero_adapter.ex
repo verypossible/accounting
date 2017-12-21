@@ -170,6 +170,19 @@ defmodule Accounting.XeroAdapter do
     |> handle_http_response()
   end
 
+  @impl Adapter
+  def setup_account_conversions(journal_id, month, year, accounts, timeout) do
+    accounts = for a <- accounts do
+      balance = to_string(a.conversion_balance / 100)
+      [number: a.number, conversion_balance: balance]
+    end
+
+    "setup_account_conversions.xml"
+    |> render(accounts: accounts, month: month, year: year)
+    |> http_client().post("Setup", timeout, creds(journal_id))
+    |> handle_http_response()
+  end
+
   @spec handle_http_response({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}) :: :ok | {:error, :duplicate | HTTPoison.Error.t}
   defp handle_http_response({:ok, %{status_code: 200}}), do: :ok
   defp handle_http_response({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
