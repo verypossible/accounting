@@ -47,10 +47,10 @@ defmodule Accounting.TestAdapterTest do
   test "setup_account_conversions/3" do
     journal_id = :black_and_blue_journal
     accounts = [
-      %Account{number: "R1234", description: "Rob Robertson"},
-      %Account{number: "T1234", description: "Tom Thompson"},
-      %Account{number: "D1234", description: "Don Donaldson"},
-      %Account{number: "J1234", description: "James Jameson"},
+      %Account{number: "R1234", conversion_balance: 1_99},
+      %Account{number: "T1234", conversion_balance: -2_32},
+      %Account{number: "D1234", conversion_balance: 1_54},
+      %Account{number: "J1234", conversion_balance: -6_32},
     ]
 
     assert :ok === TestAdapter.setup_account_conversions(

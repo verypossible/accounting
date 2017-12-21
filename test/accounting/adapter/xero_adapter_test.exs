@@ -1,7 +1,7 @@
 defmodule Accounting.XeroAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Accounting.{Entry, LineItem, XeroAdapter, XeroView}
+  alias Accounting.{Account, Entry, LineItem, XeroAdapter, XeroView}
 
   setup do
     journal_id = :oxblood_journal
@@ -36,13 +36,96 @@ defmodule Accounting.XeroAdapterTest do
   end
 
   describe "setup_accounts/3" do
-    test "returns HTTPoison errors"
-    test "creates a list of accounts"
+    setup state do
+      Map.merge(
+        state,
+        %{
+          accounts: [
+            %Account{number: "R1234", description: "Rob Robertson"},
+            %Account{number: "T1234", description: "Tom Thompson"},
+            %Account{number: "D1234", description: "Don Donaldson"},
+            %Account{number: "J1234", description: "James Jameson"},
+          ],
+        }
+      )
+    end
+
+    test "returns HTTPoison errors", %{creds: creds, journal_id: journal_id, accounts: accounts} do
+      assert {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}} ===
+        XeroAdapter.setup_accounts(journal_id, accounts, 1)
+
+      assert_received {:http_post, xml, "Setup", 1, ^creds, []}
+
+      account_assigns = for a <- accounts do
+        [number: a.number, name: "#{a.description} - #{a.number}"]
+      end
+      assert XeroView.render("setup_accounts.xml", accounts: account_assigns) === xml
+    end
+
+    test "creates a list of accounts", %{creds: creds, journal_id: journal_id, accounts: accounts} do
+      assert :ok === XeroAdapter.setup_accounts(journal_id, accounts, :infinity)
+
+      assert_received {:http_post, xml, "Setup", :infinity, ^creds, []}
+
+      account_assigns = for a <- accounts do
+        [number: a.number, name: "#{a.description} - #{a.number}"]
+      end
+      assert XeroView.render("setup_accounts.xml", accounts: account_assigns) === xml
+    end
   end
 
   describe "setup_account_conversions/3" do
-    test "returns HTTPoison errors"
-    test "sets the conversion balance for accounts"
+    setup state do
+      Map.merge(
+        state,
+        %{
+          accounts: [
+            %Account{number: "R1234", conversion_balance: 1_99},
+            %Account{number: "T1234", conversion_balance: -2_32},
+          ],
+        }
+      )
+    end
+
+    test "returns HTTPoison errors", %{creds: creds, journal_id: journal_id, accounts: accounts} do
+      month = 12
+      year = 2017
+
+      assert {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}} ===
+        XeroAdapter.setup_account_conversions(journal_id, month, year, accounts, 1)
+
+      assert_received {:http_post, xml, "Setup", 1, ^creds, []}
+
+      assigns = [
+        month: month,
+        year: year,
+        accounts: [
+          [number: "R1234", conversion_balance: "1.99"],
+          [number: "T1233", conversion_balance: "-2.32"],
+        ],
+      ]
+      assert XeroView.render("setup_account_conversions.xml", assigns) === xml
+    end
+
+    test "sets the conversion balance for accounts", %{creds: creds, journal_id: journal_id, accounts: accounts} do
+      month = 12
+      year = 2017
+
+      assert :ok ===
+        XeroAdapter.setup_account_conversions(journal_id, month, year, accounts, :infinity)
+
+      assert_received {:http_post, xml, "Setup", :infinity, ^creds, []}
+
+      assigns = [
+        month: month,
+        year: year,
+        accounts: [
+          [number: "R1234", conversion_balance: "1.99"],
+          [number: "T1233", conversion_balance: "-2.32"],
+        ],
+      ]
+      assert XeroView.render("setup_account_conversions.xml", assigns) === xml
+    end
   end
 
   describe "list_accounts/2" do

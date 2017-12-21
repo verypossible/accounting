@@ -12,4 +12,6 @@ defmodule Accounting.XeroAdapter.HTTPClient do
   @callback get(endpoint, timeout, credentials, params) :: {:ok, HTTPoison.Response.t} | {:error, HTTPoison.Error.t}
   @callback put(xml, endpoint, timeout, credentials) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
   @callback put(xml, endpoint, timeout, credentials, params) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
+  @callback post(xml, endpoint, timeout, credentials) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
+  @callback post(xml, endpoint, timeout, credentials, params) :: {:ok, HTTPoison.Response.t | HTTPoison.AsyncResponse.t} | {:error, HTTPoison.Error.t}
 end

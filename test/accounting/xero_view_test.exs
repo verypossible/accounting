@@ -54,7 +54,7 @@ defmodule Accounting.XeroViewTest do
           <AccountCode>1</AccountCode>
           <Balance>5.00</Balance>
         </ConversionBalance>
-         <ConversionBalance>
+        <ConversionBalance>
           <AccountCode>2</AccountCode>
           <Balance>-2.00</Balance>
         </ConversionBalance>

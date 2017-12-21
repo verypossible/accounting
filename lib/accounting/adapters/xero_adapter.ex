@@ -156,6 +156,35 @@ defmodule Accounting.XeroAdapter do
   defp did_register_categories({_, reasons}), do: {:error, reasons}
 
   @impl Adapter
+  def setup_accounts(journal_id, accounts, timeout) do
+    accounts = for a <- accounts do
+      length = @xero_name_char_limit - String.length(a.number) + 3
+      name = "#{truncate(a.description, length)} - #{a.number}"
+
+      [number: a.number, name: name]
+    end
+
+    "setup_accounts.xml"
+    |> render(accounts: accounts)
+    |> http_client().post("Setup", timeout, creds(journal_id))
+    |> handle_http_response()
+  end
+
+  @spec handle_http_response({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}) :: :ok | {:error, :duplicate | HTTPoison.Error.t}
+  defp handle_http_response({:ok, %{status_code: 200}}), do: :ok
+  defp handle_http_response({:ok, %{status_code: 400, body: "{" <> _ = json} = reasons}) do
+    duplication_error = %{"Message" => "Please enter a unique Code."}
+
+    if duplication_error in validation_errors(json) do
+      {:error, :duplicate}
+    else
+      {:error, reasons}
+    end
+  end
+  defp handle_http_response({_, reasons}), do: {:error, reasons}
+
+
+  @impl Adapter
   def register_account(journal_id, number, description, timeout) when is_binary(number) do
     length = @xero_name_char_limit - String.length(number) + 3
     name = "#{truncate(description, length)} - #{number}"
