@@ -15,13 +15,6 @@ defmodule Accounting.XeroView do
   end
 
   @spec render(String.t, keyword) :: String.t
-  def render("register_categories.xml", assigns) do
-    """
-    <Options>
-      #{for category <- assigns[:categories], do: render_category(category)}
-    </Options>
-    """
-  end
   def render("bank_transactions.xml", assigns) do
     """
     <BankTransactions>
@@ -47,6 +40,45 @@ defmodule Accounting.XeroView do
       <Name>#{xml_escape assigns[:name]}</Name>
       <Type>CURRLIAB</Type>
     </Account>
+    """
+  end
+  def render("register_categories.xml", assigns) do
+    """
+    <Options>
+      #{for category <- assigns[:categories], do: render_category(category)}
+    </Options>
+    """
+  end
+  def render("setup_accounts.xml", assigns) do
+    """
+    <Setup>
+      <Accounts>
+        #{for a <- assigns[:accounts], do: render("register_account.xml", a)}
+      </Accounts>
+    </Setup>
+    """
+  end
+  def render("setup_account_conversions.xml", assigns) do
+    """
+    <Setup>
+      <ConversionDate>
+        <Month>#{assigns[:month]}</Month>
+        <Year>#{assigns[:year]}</Year>
+      </ConversionDate>
+      <ConversionBalances>
+        #{for a <- assigns[:accounts], do: render_conversion_accounts(a)}
+      </ConversionBalances>
+    </Setup>
+    """
+  end
+
+  @spec render_conversion_accounts(keyword) :: String.t
+  defp render_conversion_accounts(account) do
+    """
+    <ConversionBalance>
+      <AccountCode>#{xml_escape account[:number]}</AccountCode>
+      <Balance>#{xml_escape account[:conversion_balance]}</Balance>
+    </ConversionBalance>
     """
   end
 

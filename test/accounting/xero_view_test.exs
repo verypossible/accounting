@@ -2,12 +2,14 @@ defmodule Accounting.XeroViewTest do
   use ExUnit.Case, async: true
   doctest Accounting.Entry
 
-  alias Accounting.{Account, Entry, LineItem, XeroView}
+  alias Accounting.{Entry, LineItem, XeroView}
 
   test "render setup_accounts.xml" do
     assigns = [
-      [number: 1, name: "Moe"],
-      [number: 2, name: "Curly"],
+      accounts: [
+        [number: "1", name: "Moe"],
+        [number: "2", name: "Curly"],
+      ],
     ]
 
     xml = """
@@ -35,10 +37,10 @@ defmodule Accounting.XeroViewTest do
     assigns = [
       month: 1,
       year: 2014,
-      accounts = [
-        %Account{number: 1, conversion_balance: 5_00},
-        %Account{number: 2, conversion_balance: -2_00},
-      ]
+      accounts: [
+        [number: "1", conversion_balance: "5.00"],
+        [number: "2", conversion_balance: "-2.00"],
+      ],
     ]
 
     xml = """
