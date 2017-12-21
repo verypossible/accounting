@@ -4,6 +4,8 @@ defmodule Accounting.TestAdapterTest do
 
   alias Accounting.{Account, Entry, LineItem, TestAdapter}
 
+  import Accounting.Assertions
+
   setup do
     {:ok, _} = TestAdapter.start_link([])
     :ok
@@ -21,7 +23,7 @@ defmodule Accounting.TestAdapterTest do
       assert :ok ===
         TestAdapter.setup_accounts(journal_id, accounts, :infinity)
 
-      assert_received {:setup_accounts, ^journal_id, ^accounts}
+      assert_setup_accounts(journal_id, accounts)
     end
 
     test "accounts are overwritten" do
@@ -40,7 +42,7 @@ defmodule Accounting.TestAdapterTest do
       assert {:ok, ["D1234", "J1234", "R1234", "T1234"]} ===
         TestAdapter.list_accounts(journal_id, :infinity)
 
-      assert_received {:setup_accounts, ^journal_id, ^accounts}
+      assert_setup_accounts(journal_id, accounts)
     end
   end
 
@@ -57,13 +59,7 @@ defmodule Accounting.TestAdapterTest do
       journal_id, 1, 2017, accounts, :infinity
     )
 
-    assert_received {
-      :setup_account_conversions,
-      ^journal_id,
-      1,
-      2017,
-      ^accounts
-    }
+    assert_setup_account_conversions(journal_id, 1, 2017, accounts)
   end
 
   describe "list_accounts/2" do

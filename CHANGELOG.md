@@ -1,5 +1,24 @@
 # Changelog
 
+## V0.10.4 (2017-12-21)
+
+### 1. Enhancements
+
+  * [Assertions] Add `assert_setup_accounts/2`
+  * [Assertions] Add `refute_setup_accounts/2`
+  * [Assertions] Add `assert_setup_account_conversions/4`
+  * [Assertions] Add `refute_setup_account_conversions/4`
+  * [Account] Add `Account.setup` type.
+  * [Account] Add `:description` and `:conversion_balance` fields to struct.
+  * [Adapter] Add `setup_accounts/3` callback
+  * [Adapter] Add `setup_account_conversions/5` callback
+  * [Journal] Add `setup_accounts/2-3`
+  * [Journal] Add `setup_account_conversions/4-5`
+  * [XeroAdapter] Add `setup_accounts/3`
+  * [XeroAdapter] Add `setup_account_conversions/5`
+  * [XeroAdapter.HTTPClient] Add `post/4-5` callback
+  * [XeroAdapter.DefaultHTTPClient] Add `post/4-5` callback
+
 ## v0.10.3 (2017-12-19)
 
 ### 1. Enhancements
