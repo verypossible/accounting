@@ -9,7 +9,40 @@ defmodule Accounting.TestAdapterTest do
     :ok
   end
 
-  test "setup_accounts/3"
+  describe "setup_accounts/3" do
+    test "creating new accounts" do
+      journal_id = :pink_journal
+      accounts = [
+        %Account{number: "R1234", description: "Rob Robertson"},
+        %Account{number: "T1234", description: "Tom Thompson"},
+        %Account{number: "D1234", description: "Don Donaldson"},
+        %Account{number: "J1234", description: "James Jameson"},
+      ]
+      assert :ok ===
+        TestAdapter.setup_accounts(journal_id, accounts, :infinity)
+
+      assert_received {:setup_accounts, ^journal_id, ^accounts}
+    end
+
+    test "accounts are overwritten" do
+      journal_id = :black_journal
+      number = "F1234"
+      accounts = [
+        %Account{number: "R1234", description: "Rob Robertson"},
+        %Account{number: "T1234", description: "Tom Thompson"},
+        %Account{number: "D1234", description: "Don Donaldson"},
+        %Account{number: "J1234", description: "James Jameson"},
+      ]
+      :ok = TestAdapter.register_account(journal_id, number, nil, :infinity)
+
+      assert {:ok, [number]} === TestAdapter.list_accounts(journal_id, :infinity)
+      assert :ok === TestAdapter.setup_accounts(journal_id, accounts, :infinity)
+      assert {:ok, ["D1234", "J1234", "R1234", "T1234"]} ===
+        TestAdapter.list_accounts(journal_id, :infinity)
+
+      assert_received {:setup_accounts, ^journal_id, ^accounts}
+    end
+  end
 
   test "setup_account_conversions/3"
 
