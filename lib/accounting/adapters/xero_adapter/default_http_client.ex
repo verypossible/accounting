@@ -29,7 +29,7 @@ defmodule Accounting.XeroAdapter.DefaultHTTPClient do
       |> OAuther.sign(url, [], credentials)
       |> OAuther.header()
 
-    HTTPoison.put url, xml, [oauth_header, {"Accept", "application/json"}],
+    HTTPoison.post url, xml, [oauth_header, {"Accept", "application/json"}],
       recv_timeout: timeout
   end
 
