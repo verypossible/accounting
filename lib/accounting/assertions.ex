@@ -141,4 +141,32 @@ defmodule Accounting.Assertions do
       @timeout -> true
     end
   end
+
+  @spec assert_recorded_invoices(Journal.id, [Entry.t]) :: true | no_return
+  def assert_recorded_invoices(journal_id, entries) do
+    receive do
+      {:recorded_invoices, ^journal_id, ^entries} -> true
+    after
+      @timeout ->
+        flunk """
+        Invoices were not recorded:
+
+        #{inspect entries}
+        """
+    end
+  end
+
+  @spec refute_recorded_invoices(Journal.id, [Entry.t]) :: true | no_return
+  def refute_recorded_invoices(journal_id, entries) do
+    receive do
+      {:recorded_invoices, ^journal_id, ^entries} ->
+        flunk """
+        Unexpected invoices were recorded:
+
+        #{inspect entries}
+        """
+    after
+      @timeout -> true
+    end
+  end
 end

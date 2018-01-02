@@ -244,6 +244,98 @@ defmodule Accounting.TestAdapterTest do
     end
   end
 
+  describe "record_invoices/3" do
+    test "with an entry on an unregistered account" do
+      journal_id = :blue_journal
+      party = "Moonbeams Unlimited"
+      date = ~D[1999-12-31]
+      number = "Z100"
+      items = [
+        %LineItem{account_number: number, amount: 0_02, description: "Photons"},
+        %LineItem{account_number: number, amount: 0, description: "Free hugs"},
+      ]
+      entry = Entry.new(party, date, items)
+      assert {:error, :no_such_account} ===
+        TestAdapter.record_invoices(journal_id, [entry], :infinity)
+
+      assert_received {:recorded_invoices, ^journal_id, [^entry]}
+
+      assert {:ok, %{^number => account}} =
+        TestAdapter.fetch_accounts(journal_id, [number], :infinity)
+
+      assert [] === Account.transactions(account)
+    end
+
+    test "with an entry on a registered account" do
+      journal_id = :red_journal
+      :ok = TestAdapter.register_account(journal_id, "F200", nil, :infinity)
+      party = "Leo"
+      date = ~D[1093-11-11]
+      number = "F200"
+      amount = 2_09
+      desc = "Air"
+      item = %LineItem{
+        account_number: number,
+        amount: amount,
+        description: desc,
+      }
+      entry = Entry.new(party, date, [item])
+      assert :ok ===
+        TestAdapter.record_invoices(journal_id, [entry], :infinity)
+
+      assert_received {:recorded_invoices, ^journal_id, [^entry]}
+
+      assert {:ok, %{^number => account}} =
+        TestAdapter.fetch_accounts(journal_id, [number], :infinity)
+
+      assert [%{amount: ^amount, date: ^date, description: ^desc}] =
+        Account.transactions(account)
+    end
+
+    test "with multiple entries on registered accounts" do
+      journal_id = :aubergine_journal
+      number1 = "H300"
+      number2 = "X400"
+      :ok = TestAdapter.register_account(journal_id, number1, nil, :infinity)
+      :ok = TestAdapter.register_account(journal_id, number2, nil, :infinity)
+      party1 = "Dillards"
+      party2 = "Design Within Reach"
+      date1 = ~D[2023-08-15]
+      date2 = ~D[1992-02-02]
+      amount1 = 1_849_49
+      amount2 = 0_38
+      desc1 = "Leaves"
+      desc2 = "Designer furniture"
+      item1 = %LineItem{
+        account_number: number1,
+        amount: amount1,
+        description: desc1,
+      }
+      item2 = %LineItem{
+        account_number: number2,
+        amount: amount2,
+        description: desc2,
+      }
+      entries = [
+        Entry.new(party1, date1, [item1]),
+        Entry.new(party2, date2, [item2]),
+      ]
+      assert :ok ===
+        TestAdapter.record_invoices(journal_id, entries, :infinity)
+
+      assert_received {:recorded_invoices, ^journal_id, ^entries}
+
+      assert {:ok, %{^number1 => account1, ^number2 => account2}} =
+        TestAdapter.fetch_accounts(journal_id, [number1, number2], :infinity)
+
+      assert [%{amount: ^amount1, date: ^date1, description: ^desc1}] =
+        Account.transactions(account1)
+
+      assert [%{amount: ^amount2, date: ^date2, description: ^desc2}] =
+        Account.transactions(account2)
+    end
+  end
+
   describe "register_account/3" do
     setup do: %{name: "Margus Laroux", number: "F300"}
 

@@ -323,4 +323,43 @@ defmodule Accounting.XeroAdapterTest do
         XeroAdapter.record_entries(journal_id, entries, 3)
     end
   end
+
+  describe "record_invoices/3" do
+    test "returns HTTPoison errors", %{bank_id: bank_id, creds: creds, journal_id: journal_id, params: params} do
+      item = %LineItem{account_number: "B42", amount: 4_99, description: "Soap"}
+      entry = Entry.new("Bill", ~D[1937-02-26], [item])
+      assert {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}} ===
+        XeroAdapter.record_invoices(journal_id, [entry], 1)
+
+      assert_received {:http_put, xml, "Invoices", 1, ^creds, ^params}
+
+      assigns = [bank_account_id: bank_id, entries: [entry]]
+      assert XeroView.render("invoices.xml", assigns) === xml
+    end
+
+    test "returns non-200s as errors", %{bank_id: bank_id, creds: creds, journal_id: journal_id, params: params} do
+      item = %LineItem{account_number: "B43", amount: 5_99, description: "Soup"}
+      entry = Entry.new("Bob", ~D[1937-02-25], [item])
+      assert {:error, %HTTPoison.Response{status_code: 400, headers: []}} ===
+        XeroAdapter.record_invoices(journal_id, [entry], 2)
+
+      assert_received {:http_put, xml, "Invoices", 2, ^creds, ^params}
+
+      assigns = [bank_account_id: bank_id, entries: [entry]]
+      assert XeroView.render("invoices.xml", assigns) === xml
+    end
+
+    test "with a net-zero entry", %{creds: creds, journal_id: journal_id, params: params} do
+      item1 = %LineItem{account_number: "F2", amount: 2_09, description: "Air"}
+      item2 = %LineItem{account_number: "G2", amount: -2_09, description: "T"}
+      entry = Entry.new("Leo", ~D[1093-11-11], [item1, item2])
+      assert :ok ===
+        XeroAdapter.record_invoices(journal_id, [entry], :infinity)
+
+      assert_received {:http_put, xml, "Invoices", :infinity, ^creds, ^params}
+
+      assigns = [entries: [entry]]
+      assert XeroView.render("invoices.xml", assigns) === xml
+    end
+  end
 end

@@ -239,7 +239,7 @@ defmodule Accounting.XeroAdapter do
   @impl Adapter
   def record_entries(journal_id, entries, timeout) do
     case Enum.split_with(entries, & &1.total === 0) do
-      {_, []} -> post_invoices(journal_id, entries, timeout)
+      {_, []} -> record_invoices(journal_id, entries, timeout)
       {[], _} -> post_bank_transactions(journal_id, entries, timeout)
       _ -> {:error, :mixed_entries}
     end
@@ -271,19 +271,20 @@ defmodule Accounting.XeroAdapter do
   end
   defp did_post_bank_transactions({_, reasons}, _entries), do: {:error, reasons}
 
-  @spec post_invoices(Journal.id, [Entry.t], timeout) :: :ok | {:error, term}
-  defp post_invoices(_journal_id, [], _timeout), do: :ok
-  defp post_invoices(journal_id, entries, timeout) do
+  @impl Adapter
+  @spec record_invoices(Journal.id, [Entry.t], timeout) :: :ok | {:error, term}
+  def record_invoices(_journal_id, [], _timeout), do: :ok
+  def record_invoices(journal_id, entries, timeout) do
     params = [summarizeErrors: false]
 
     "invoices.xml"
     |> render(entries: entries)
     |> http_client().put("Invoices", timeout, creds(journal_id), params)
-    |> did_post_invoices(entries)
+    |> did_record_invoices(entries)
   end
 
-  @spec did_post_invoices({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}, [Entry.t, ...]) :: :ok | {:error, HTTPoison.Error.t | HTTPoison.Response.t}
-  defp did_post_invoices({:ok, %{body: json, status_code: 200}}, entries) do
+  @spec did_record_invoices({:ok, HTTPoison.Response.t} | {:error, Elixir.HTTPoison.Error.t}, [Entry.t, ...]) :: :ok | {:error, HTTPoison.Error.t | HTTPoison.Response.t}
+  defp did_record_invoices({:ok, %{body: json, status_code: 200}}, entries) do
     invoices =
       json
       |> Poison.decode!()
@@ -294,7 +295,7 @@ defmodule Accounting.XeroAdapter do
       errors -> {:error, errors}
     end
   end
-  defp did_post_invoices({_, reasons}, _entries), do: {:error, reasons}
+  defp did_record_invoices({_, reasons}, _entries), do: {:error, reasons}
 
   @spec extract_errors([map], [Entry.t], [Entry.Error.t]) :: [Entry.Error.t]
   defp extract_errors([], _, acc), do: Enum.reverse(acc)
