@@ -91,6 +91,10 @@ defmodule StubXeroAdapterHTTPClient do
   @spec put_invoices(timeout) :: {:ok, HTTPoison.Response.t}
   defp put_invoices(timeout) do
     case timeout do
+      1 ->
+        {:error, %HTTPoison.Error{reason: HTTPoison.SuperError}}
+      2 ->
+        {:ok, %HTTPoison.Response{status_code: 400}}
       3 ->
         invoices = [
           %{ValidationErrors: []},

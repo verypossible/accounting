@@ -95,6 +95,17 @@ defmodule Accounting.TestAdapter do
     end
   end
 
+  @impl Adapter
+  def record_invoices(journal_id, entries, _timeout) do
+    send self(), {:recorded_invoices, journal_id, entries}
+    Enum.reduce_while entries, :ok, fn e, _ ->
+      case record_entry(journal_id, e) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end
+  end
+
   @spec record_entry(Journal.id, Entry.t) :: :ok | {:error, :no_such_account}
   defp record_entry(journal_id, entry) do
     %Entry{

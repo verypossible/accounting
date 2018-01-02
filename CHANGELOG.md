@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.5 (2018-1-2)
+
+### 1. Enhancements
+
+  * [Assertions] Add `assert_recorded_invoices/2`
+  * [Assertions] Add `refute_recorded_invoices/2`
+  * [Adapter] Add `record_invoices/3` callback
+  * [Journal] Add `record_invoices/2-3`
+  * [XeroAdapter] Add `record_invoices/3`
+
 ## v0.10.4 (2017-12-22)
 
 ### 1. Enhancements

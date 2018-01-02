@@ -52,6 +52,11 @@ defmodule Accounting.Journal do
     adapter().record_entries(journal_id, entries, timeout)
   end
 
+  @spec record_invoices(Journal.id, [Entry.t, ...], timeout) :: :ok | {:error, term}
+  def record_invoices(journal_id, [_|_] = entries, timeout \\ @default_timeout) do
+    adapter().record_invoices(journal_id, entries, timeout)
+  end
+
   @spec adapter() :: module
   defp adapter, do: Agent.get(__MODULE__, & &1)
 
