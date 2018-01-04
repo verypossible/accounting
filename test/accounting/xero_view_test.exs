@@ -227,6 +227,102 @@ defmodule Accounting.XeroViewTest do
       remove_whitespace(XeroView.render("bank_transactions.xml", assigns))
   end
 
+  test "render invoices.xml with a positive total" do
+    item1 = %LineItem{account_number: "G123", amount: 3, description: "toon"}
+    item2 = %LineItem{account_number: "F123", amount: -2, description: "toon"}
+    entry = Entry.new("Bill", ~D[2013-02-01], [item1, item2])
+    assigns = [entries: [entry]]
+    xml = """
+    <Invoices>
+      <Invoice>
+        <Type>ACCREC</Type>
+        <Status>AUTHORISED</Status>
+        <Contact><Name>#{entry.party}</Name></Contact>
+        <Date>#{entry.date}</Date>
+        <DueDate>#{entry.date}</DueDate>
+        <LineAmountTypes>NoTax</LineAmountTypes>
+        <LineItems>
+          <LineItem>
+            <Description>#{item1.description}</Description>
+            <Quantity>1</Quantity>
+            <UnitAmount>0.03</UnitAmount>
+            <AccountCode>#{item1.account_number}</AccountCode>
+            <Tracking>
+              <TrackingCategory>
+                <Name>Category</Name>
+                <Option>other</Option>
+              </TrackingCategory>
+            </Tracking>
+          </LineItem>
+          <LineItem>
+            <Description>#{item2.description}</Description>
+            <Quantity>1</Quantity>
+            <UnitAmount>-0.02</UnitAmount>
+            <AccountCode>#{item2.account_number}</AccountCode>
+            <Tracking>
+              <TrackingCategory>
+                <Name>Category</Name>
+                <Option>other</Option>
+              </TrackingCategory>
+            </Tracking>
+          </LineItem>
+        </LineItems>
+      </Invoice>
+    </Invoices>
+    """
+
+    assert remove_whitespace(xml) ===
+      remove_whitespace(XeroView.render("invoices.xml", assigns))
+  end
+
+  test "render invoices.xml with a negative total" do
+    item1 = %LineItem{account_number: "G123", amount: -3, description: "toon"}
+    item2 = %LineItem{account_number: "F123", amount: 2, description: "toon"}
+    entry = Entry.new("Bill", ~D[2013-02-01], [item1, item2])
+    assigns = [entries: [entry]]
+    xml = """
+    <Invoices>
+      <Invoice>
+        <Type>ACCPAY</Type>
+        <Status>AUTHORISED</Status>
+        <Contact><Name>#{entry.party}</Name></Contact>
+        <Date>#{entry.date}</Date>
+        <DueDate>#{entry.date}</DueDate>
+        <LineAmountTypes>NoTax</LineAmountTypes>
+        <LineItems>
+          <LineItem>
+            <Description>#{item1.description}</Description>
+            <Quantity>1</Quantity>
+            <UnitAmount>0.03</UnitAmount>
+            <AccountCode>#{item1.account_number}</AccountCode>
+            <Tracking>
+              <TrackingCategory>
+                <Name>Category</Name>
+                <Option>other</Option>
+              </TrackingCategory>
+            </Tracking>
+          </LineItem>
+          <LineItem>
+            <Description>#{item2.description}</Description>
+            <Quantity>1</Quantity>
+            <UnitAmount>-0.02</UnitAmount>
+            <AccountCode>#{item2.account_number}</AccountCode>
+            <Tracking>
+              <TrackingCategory>
+                <Name>Category</Name>
+                <Option>other</Option>
+              </TrackingCategory>
+            </Tracking>
+          </LineItem>
+        </LineItems>
+      </Invoice>
+    </Invoices>
+    """
+
+    assert remove_whitespace(xml) ===
+      remove_whitespace(XeroView.render("invoices.xml", assigns))
+  end
+
   test "render invoices.xml with a single entry" do
     item1 = %LineItem{account_number: "G123", amount: 3, description: "toon"}
     item2 = %LineItem{account_number: "F456", amount: -3, description: "ton"}

@@ -1,5 +1,11 @@
 # Changelog
 
+## V0.11.0 (2018-1-4)
+
+### 1. Enhancements
+
+  * [XeroView] Ability to create `ACCPAY` invoices.
+
 ## v0.10.5 (2018-1-2)
 
 ### 1. Enhancements

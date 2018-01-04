@@ -117,6 +117,14 @@ defmodule Accounting.XeroView do
     """
   end
 
+  @spec line_item_renderer(Entry.t) :: (LineItem.t -> String.t)
+  defp line_item_renderer(entry) do
+    cond do
+      entry.total >= 0 -> &render_line_item/1
+      entry.total < 0 -> &render_reverse_line_item/1
+    end
+  end
+
   @spec render_category(atom) :: String.t
   defp render_category(category) do
     """
@@ -128,11 +136,7 @@ defmodule Accounting.XeroView do
 
   @spec render_bank_transaction(Entry.t, String.t) :: String.t
   defp render_bank_transaction(entry, bank_account_id) do
-    render_item_fun =
-      cond do
-        entry.total > 0 -> &render_line_item/1
-        entry.total < 0 -> &render_reverse_line_item/1
-      end
+    render_item_fun = line_item_renderer(entry)
 
     """
     <BankTransaction>
@@ -151,19 +155,29 @@ defmodule Accounting.XeroView do
 
   @spec render_invoice(Entry.t) :: String.t
   defp render_invoice(entry) do
+    render_item_fun = line_item_renderer(entry)
+
     """
     <Invoice>
-      <Type>ACCREC</Type>
+      <Type>#{invoice_type entry}</Type>
       <Status>AUTHORISED</Status>
       <Contact><Name>#{xml_escape entry.party}</Name></Contact>
       <Date>#{entry.date}</Date>
       <DueDate>#{entry.date}</DueDate>
       <LineAmountTypes>NoTax</LineAmountTypes>
       <LineItems>
-        #{for line_item <- entry.line_items, do: render_line_item(line_item)}
+        #{for line_item <- entry.line_items, do: render_item_fun.(line_item)}
       </LineItems>
     </Invoice>
     """
+  end
+
+  defp invoice_type(entry) do
+    if entry.total >= 0 do
+      "ACCREC"
+    else
+      "ACCPAY"
+    end
   end
 
   @spec dollar_string_from_pennies(integer) :: String.t
